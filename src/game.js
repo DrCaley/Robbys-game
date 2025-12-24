@@ -29,6 +29,13 @@ let startTime = 0;
 let mouseX = 0, mouseY = 0;
 let isPointerLocked = false;
 
+// Net state
+let net = null;
+let netSwinging = false;
+let netSwingTime = 0;
+const NET_SWING_DURATION = 300; // milliseconds
+const NET_CATCH_RANGE = 4; // how far the net reaches
+
 // ===== THREE.JS SETUP =====
 function initThree() {
     // Scene
@@ -87,7 +94,12 @@ function initThree() {
     const canvas = document.getElementById('game-canvas');
     canvas.addEventListener('click', () => {
         if (gameRunning) {
-            canvas.requestPointerLock();
+            if (!isPointerLocked) {
+                canvas.requestPointerLock();
+            } else {
+                // Swing net when clicking (and pointer is locked)
+                swingNet();
+            }
         }
     });
     
@@ -102,6 +114,112 @@ function initThree() {
             pitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, pitch));
         }
     });
+    
+    // Create the net
+    createNet();
+}
+
+function createNet() {
+    net = new THREE.Group();
+    
+    // Net handle (wooden pole)
+    const handleGeometry = new THREE.CylinderGeometry(0.03, 0.04, 1.5, 8);
+    const handleMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+    handle.rotation.x = Math.PI / 2;
+    handle.position.z = -0.75;
+    net.add(handle);
+    
+    // Net ring (hoop)
+    const ringGeometry = new THREE.TorusGeometry(0.4, 0.02, 8, 24);
+    const ringMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.position.z = -1.5;
+    ring.rotation.x = Math.PI / 2;
+    net.add(ring);
+    
+    // Net mesh (the catching part)
+    const netMeshGeometry = new THREE.ConeGeometry(0.38, 0.6, 12, 1, true);
+    const netMeshMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        wireframe: true
+    });
+    const netMesh = new THREE.Mesh(netMeshGeometry, netMeshMaterial);
+    netMesh.position.z = -1.5;
+    netMesh.position.y = -0.3;
+    netMesh.rotation.x = Math.PI;
+    net.add(netMesh);
+    
+    // Position net in front of camera (will be updated each frame)
+    camera.add(net);
+    net.position.set(0.4, -0.3, -0.5); // Right side, slightly down, in front
+    net.rotation.set(0.3, 0.2, 0); // Slight tilt
+}
+
+function swingNet() {
+    if (netSwinging) return; // Already swinging
+    
+    netSwinging = true;
+    netSwingTime = Date.now();
+    
+    // Check if any animal is in range
+    checkNetCatch();
+}
+
+function checkNetCatch() {
+    // Calculate where the net is pointing (in front of player)
+    const netReachX = player.x - Math.sin(yaw) * NET_CATCH_RANGE;
+    const netReachZ = player.z - Math.cos(yaw) * NET_CATCH_RANGE;
+    
+    animals.forEach(animal => {
+        if (animal.caught) return;
+        
+        // Check distance from animal to net swing area
+        const dx = animal.x - player.x;
+        const dz = animal.z - player.z;
+        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+        
+        // Animal must be within range
+        if (distToPlayer > NET_CATCH_RANGE) return;
+        
+        // Check if animal is roughly in front of player (within ~60 degree cone)
+        const angleToAnimal = Math.atan2(-dx, -dz);
+        let angleDiff = angleToAnimal - yaw;
+        
+        // Normalize angle difference
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        
+        if (Math.abs(angleDiff) < Math.PI / 3) { // Within 60 degree cone
+            catchAnimal(animal);
+        }
+    });
+}
+
+function updateNet() {
+    if (!net) return;
+    
+    if (netSwinging) {
+        const elapsed = Date.now() - netSwingTime;
+        const progress = elapsed / NET_SWING_DURATION;
+        
+        if (progress >= 1) {
+            // Swing complete, reset
+            netSwinging = false;
+            net.rotation.set(0.3, 0.2, 0);
+            net.position.set(0.4, -0.3, -0.5);
+        } else {
+            // Animate swing - arc from right to center
+            const swingAngle = Math.sin(progress * Math.PI) * 1.5;
+            net.rotation.z = -swingAngle;
+            net.rotation.y = 0.2 - swingAngle * 0.5;
+            net.position.x = 0.4 - swingAngle * 0.3;
+            net.position.z = -0.5 - Math.sin(progress * Math.PI) * 0.3;
+        }
+    }
 }
 
 function createGround() {
@@ -399,13 +517,7 @@ function updateAnimals() {
         const dz = player.z - animal.z;
         const distToPlayer = Math.sqrt(dx*dx + dz*dz);
         
-        // Catch animal if close enough
-        if (distToPlayer < 1.5) {
-            catchAnimal(animal);
-            return;
-        }
-        
-        // Run away if player is close
+        // Run away if player is close (removed auto-catch - must use net!)
         if (distToPlayer < 15) {
             // Move away from player
             const angle = Math.atan2(animal.z - player.z, animal.x - player.x);
@@ -515,6 +627,7 @@ function animate() {
     
     updatePlayer();
     updateAnimals();
+    updateNet();
     updateUI();
     
     renderer.render(scene, camera);

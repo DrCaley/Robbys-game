@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌲 Robby's Forest Adventure 🦊</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen">
+            <h1>🌲 Robby's Forest Adventure 🦊</h1>
+            <p>Explore the magical forest and catch all the animals!</p>
+            <div class="controls-info">
+                <p>🎮 <strong>WASD</strong> or <strong>Arrow Keys</strong> to move</p>
+                <p>🖱️ <strong>Mouse</strong> to look around</p>
+                <p>🏃 <strong>Shift</strong> to run faster</p>
+                <p>🎯 Walk into animals to catch them!</p>
+            </div>
+            <button id="start-btn" onclick="startGame()">🎮 Start Adventure!</button>
+        </div>
+        
+        <!-- Game UI Overlay -->
+        <div id="game-ui" style="display: none;">
+            <div id="stats">
+                <span id="animals-caught">🎯 Caught: 0/10</span>
+                <span id="timer">⏱️ Time: 0:00</span>
+            </div>
+            <div id="caught-display"></div>
+            <p id="message"></p>
+        </div>
+        
+        <!-- Win Screen -->
+        <div id="win-screen" class="screen" style="display: none;">
+            <h1>🏆 Amazing! 🏆</h1>
+            <p>You caught all the animals!</p>
+            <div id="final-time"></div>
+            <div id="animals-collected"></div>
+            <button onclick="location.reload()">🔄 Play Again!</button>
+        </div>
+        
+        <!-- Canvas for 3D -->
+        <canvas id="game-canvas"></canvas>
+    </div>
+    
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

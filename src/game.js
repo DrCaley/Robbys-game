@@ -453,8 +453,8 @@ function createRabbit(animal, bodyMat, whiteMat, darkMat, noseMat) {
     nose.position.set(0, 0.52, 0.55);
     animal.add(nose);
     
-    // Long ears!
-    const earGeo = new THREE.CapsuleGeometry(0.06, 0.4, 4, 8);
+    // Long ears! (using cylinder since CapsuleGeometry not in r128)
+    const earGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.45, 8);
     const leftEar = new THREE.Mesh(earGeo, bodyMat);
     leftEar.position.set(-0.1, 0.95, 0.3);
     leftEar.rotation.x = -0.2;
@@ -467,12 +467,13 @@ function createRabbit(animal, bodyMat, whiteMat, darkMat, noseMat) {
     animal.add(rightEar);
     
     // Inner ear (pink)
-    const innerEar1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.3, 4, 8), pinkNose);
+    const innerEarGeo = new THREE.CylinderGeometry(0.03, 0.025, 0.35, 8);
+    const innerEar1 = new THREE.Mesh(innerEarGeo, pinkNose);
     innerEar1.position.set(-0.1, 0.93, 0.32);
     innerEar1.rotation.x = -0.2;
     innerEar1.rotation.z = -0.15;
     animal.add(innerEar1);
-    const innerEar2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.3, 4, 8), pinkNose);
+    const innerEar2 = new THREE.Mesh(innerEarGeo, pinkNose);
     innerEar2.position.set(0.1, 0.93, 0.32);
     innerEar2.rotation.x = -0.2;
     innerEar2.rotation.z = 0.15;

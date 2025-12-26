@@ -1863,92 +1863,100 @@ function startGame() {
 function updatePlayer() {
     if (!gameRunning) return;
     
-    const baseSpeed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.008 : 0.004;
+    const baseSpeed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.4 : 0.2;
     
-    // Movement on sphere - change theta (longitude) and phi (latitude)
-    let dTheta = 0, dPhi = 0;
-    
-    // Forward = direction camera is looking
-    if (keys['KeyW'] || keys['ArrowUp']) {
-        dTheta += Math.sin(yaw) * baseSpeed;
-        dPhi += Math.cos(yaw) * baseSpeed;
-    }
-    if (keys['KeyS'] || keys['ArrowDown']) {
-        dTheta -= Math.sin(yaw) * baseSpeed;
-        dPhi -= Math.cos(yaw) * baseSpeed;
-    }
-    // Strafe left
-    if (keys['KeyA'] || keys['ArrowLeft']) {
-        dTheta += Math.cos(yaw) * baseSpeed;
-        dPhi -= Math.sin(yaw) * baseSpeed;
-    }
-    // Strafe right
-    if (keys['KeyD'] || keys['ArrowRight']) {
-        dTheta -= Math.cos(yaw) * baseSpeed;
-        dPhi += Math.sin(yaw) * baseSpeed;
-    }
-    
-    // Apply movement (theta wraps around, phi is clamped to avoid poles)
-    const newTheta = playerTheta + dTheta;
-    const newPhi = Math.max(0.1, Math.min(Math.PI - 0.1, playerPhi + dPhi));
-    
-    // Check tree collisions using angular distance
-    let canMove = true;
-    trees.forEach(tree => {
-        const angDist = angularDistance(newTheta, newPhi, tree.theta, tree.phi);
-        if (angDist < 0.03) { // Smaller collision radius (was 0.05)
-            canMove = false;
-        }
-    });
-    
-    // Always allow movement if no actual input (avoid stuck state)
-    if (dTheta === 0 && dPhi === 0) {
-        canMove = true;
-    }
-    
-    if (canMove || true) { // Temporarily bypass collision for testing
-        playerTheta = newTheta;
-        playerPhi = newPhi;
-        
-        // Keep theta in [0, 2*PI] range
-        while (playerTheta < 0) playerTheta += Math.PI * 2;
-        while (playerTheta >= Math.PI * 2) playerTheta -= Math.PI * 2;
-    }
-    
-    // Update camera position on sphere
-    const playerPos = getPositionOnPlanet(playerTheta, playerPhi, 1.6);
-    camera.position.copy(playerPos);
-    
-    // Camera orientation: up vector points away from planet center
+    // Get current position
+    const playerPos = getPositionOnPlanet(playerTheta, playerPhi, 0);
     const upVector = playerPos.clone().normalize();
     
-    // Calculate forward direction (tangent to sphere)
-    // tangentTheta goes around the "equator" at this latitude
-    // tangentPhi goes towards/away from the poles
+    // Calculate tangent vectors at current position
     const tangentTheta = new THREE.Vector3(
         -Math.sin(playerTheta),
         0,
         Math.cos(playerTheta)
     ).normalize();
     
-    // tangentPhi points "south" (towards increasing phi / south pole)
     const tangentPhi = new THREE.Vector3(
         -Math.cos(playerPhi) * Math.cos(playerTheta),
         Math.sin(playerPhi),
         -Math.cos(playerPhi) * Math.sin(playerTheta)
     ).normalize();
     
-    // Combine tangents based on yaw to get look direction
-    // yaw = 0 means looking in -Z direction on flat world, which is "south" on sphere
+    // Forward direction based on yaw (same as camera)
     const forward = tangentTheta.clone().multiplyScalar(-Math.sin(yaw))
-        .add(tangentPhi.clone().multiplyScalar(-Math.cos(yaw)));
+        .add(tangentPhi.clone().multiplyScalar(-Math.cos(yaw))).normalize();
+    
+    // Right direction (perpendicular to forward and up)
+    const right = new THREE.Vector3().crossVectors(forward, upVector).normalize();
+    
+    // Calculate movement in world space
+    let moveDir = new THREE.Vector3(0, 0, 0);
+    
+    if (keys['KeyW'] || keys['ArrowUp']) {
+        moveDir.add(forward);
+    }
+    if (keys['KeyS'] || keys['ArrowDown']) {
+        moveDir.sub(forward);
+    }
+    if (keys['KeyA'] || keys['ArrowLeft']) {
+        moveDir.sub(right);
+    }
+    if (keys['KeyD'] || keys['ArrowRight']) {
+        moveDir.add(right);
+    }
+    
+    if (moveDir.length() > 0) {
+        moveDir.normalize().multiplyScalar(baseSpeed);
+        
+        // Calculate new position in world space
+        const newWorldPos = playerPos.clone().add(moveDir);
+        
+        // Project back onto sphere and convert to theta/phi
+        newWorldPos.normalize().multiplyScalar(PLANET_RADIUS);
+        
+        // Convert cartesian back to spherical
+        const newPhi = Math.acos(Math.max(-1, Math.min(1, newWorldPos.y / PLANET_RADIUS)));
+        let newTheta = Math.atan2(newWorldPos.z, newWorldPos.x);
+        if (newTheta < 0) newTheta += Math.PI * 2;
+        
+        // Clamp phi to avoid poles
+        const clampedPhi = Math.max(0.1, Math.min(Math.PI - 0.1, newPhi));
+        
+        // Update player position
+        playerTheta = newTheta;
+        playerPhi = clampedPhi;
+    }
+    
+    // Update camera position on sphere (with eye height)
+    const finalPos = getPositionOnPlanet(playerTheta, playerPhi, 1.6);
+    camera.position.copy(finalPos);
+    
+    // Camera orientation: up vector points away from planet center
+    const finalUp = finalPos.clone().normalize();
+    
+    // Recalculate tangent vectors at new position for camera
+    const newTangentTheta = new THREE.Vector3(
+        -Math.sin(playerTheta),
+        0,
+        Math.cos(playerTheta)
+    ).normalize();
+    
+    const newTangentPhi = new THREE.Vector3(
+        -Math.cos(playerPhi) * Math.cos(playerTheta),
+        Math.sin(playerPhi),
+        -Math.cos(playerPhi) * Math.sin(playerTheta)
+    ).normalize();
+    
+    // Camera forward direction based on yaw
+    const camForward = newTangentTheta.clone().multiplyScalar(-Math.sin(yaw))
+        .add(newTangentPhi.clone().multiplyScalar(-Math.cos(yaw)));
     
     // Apply pitch - positive pitch looks up
-    const lookDir = forward.clone()
-        .add(upVector.clone().multiplyScalar(Math.sin(pitch)));
+    const lookDir = camForward.clone()
+        .add(finalUp.clone().multiplyScalar(Math.sin(pitch)));
     
-    const lookTarget = playerPos.clone().add(lookDir);
-    camera.up.copy(upVector);
+    const lookTarget = finalPos.clone().add(lookDir);
+    camera.up.copy(finalUp);
     camera.lookAt(lookTarget);
     
     // Store player position for animal collision detection

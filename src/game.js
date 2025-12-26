@@ -1833,6 +1833,9 @@ function startGame() {
     // Set initial player position on sphere surface
     playerLat = 0;
     playerLon = 0;
+    yaw = 0;
+    pitch = -0.2; // Slight downward tilt to see the ground
+    
     const startPos = latLonToPosition(playerLat, playerLon, PLANET_RADIUS + 1.6);
     player.x = startPos.x;
     player.y = startPos.y;
@@ -1850,8 +1853,13 @@ function startGame() {
     }
     playerRight = new THREE.Vector3().crossVectors(playerForward, playerUp).normalize();
     camera.up.copy(playerUp);
-    camera.lookAt(startPos.clone().add(playerForward));
-    console.log('Camera looking at:', playerForward.x, playerForward.y, playerForward.z);
+    
+    // Look forward and slightly down
+    const lookTarget = startPos.clone()
+        .add(playerForward.clone().multiplyScalar(10))
+        .add(playerUp.clone().multiplyScalar(-2)); // Look slightly down
+    camera.lookAt(lookTarget);
+    console.log('Camera looking toward:', lookTarget.x, lookTarget.y, lookTarget.z);
     
     // Request pointer lock
     document.getElementById('game-canvas').requestPointerLock();

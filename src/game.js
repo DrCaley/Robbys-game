@@ -193,7 +193,7 @@ function swingNet() {
 
 function checkNetCatch() {
     // Net catch range in angular distance (radians)
-    const netRangeAngular = NET_CATCH_RANGE / PLANET_RADIUS; // ~0.06 radians for range 3 on r=50
+    const netRangeAngular = NET_CATCH_RANGE / PLANET_RADIUS; // ~0.08 radians for range 4 on r=50
     
     animals.forEach(animal => {
         if (animal.caught) return;
@@ -209,8 +209,9 @@ function checkNetCatch() {
         const dTheta = animal.theta - playerTheta;
         const dPhi = animal.phi - playerPhi;
         
-        // Simple approximation: check if the direction to animal aligns with yaw
-        const angleToAnimal = Math.atan2(dTheta, -dPhi);
+        // When yaw=0, player faces direction of increasing phi (south)
+        // atan2(x, y) where x is theta direction, y is phi direction
+        const angleToAnimal = Math.atan2(-dTheta, dPhi);
         let angleDiff = angleToAnimal - yaw;
         
         // Normalize angle difference

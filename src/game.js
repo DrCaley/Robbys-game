@@ -39,9 +39,9 @@ let isPointerLocked = false;
 const PLANET_RADIUS = 80;
 let playerLat = 0; // latitude angle (north/south)
 let playerLon = 0; // longitude angle (east/west)
-let playerUp = new THREE.Vector3(0, 1, 0);
-let playerForward = new THREE.Vector3(0, 0, -1);
-let playerRight = new THREE.Vector3(1, 0, 0);
+let playerUp = null;
+let playerForward = null;
+let playerRight = null;
 
 // Net state
 let net = null;
@@ -55,7 +55,12 @@ function initThree() {
     // Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x5dade2); // Tropical blue sky
-    scene.fog = new THREE.Fog(0x5dade2, 30, 100);
+    scene.fog = new THREE.Fog(0x5dade2, 30, 150);
+    
+    // Initialize player direction vectors
+    playerUp = new THREE.Vector3(0, 1, 0);
+    playerForward = new THREE.Vector3(0, 0, -1);
+    playerRight = new THREE.Vector3(1, 0, 0);
     
     // Camera (first person)
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);

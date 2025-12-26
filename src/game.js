@@ -88,7 +88,14 @@ function initThree() {
     
     // Event listeners
     window.addEventListener('resize', onWindowResize);
-    document.addEventListener('keydown', (e) => keys[e.code] = true);
+    document.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        // Swing net with spacebar
+        if (e.code === 'Space' && gameRunning && isPointerLocked) {
+            e.preventDefault(); // Prevent page scroll
+            swingNet();
+        }
+    });
     document.addEventListener('keyup', (e) => keys[e.code] = false);
     
     // Pointer lock for mouse look

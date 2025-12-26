@@ -1831,6 +1831,26 @@ function startGame() {
     startTime = Date.now();
     caughtAnimals = [];
     
+    // Set initial player position on sphere surface
+    playerLat = 0;
+    playerLon = 0;
+    const startPos = latLonToPosition(playerLat, playerLon, PLANET_RADIUS + 1.6);
+    player.x = startPos.x;
+    player.y = startPos.y;
+    player.z = startPos.z;
+    camera.position.copy(startPos);
+    
+    // Set initial camera orientation (looking tangent to sphere)
+    playerUp = startPos.clone().normalize();
+    const northPole = new THREE.Vector3(0, 1, 0);
+    playerForward = new THREE.Vector3().crossVectors(playerUp, northPole).normalize();
+    if (playerForward.length() < 0.1) {
+        playerForward.set(1, 0, 0);
+    }
+    playerRight = new THREE.Vector3().crossVectors(playerForward, playerUp).normalize();
+    camera.up.copy(playerUp);
+    camera.lookAt(startPos.clone().add(playerForward));
+    
     // Request pointer lock
     document.getElementById('game-canvas').requestPointerLock();
     

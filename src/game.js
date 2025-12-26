@@ -1868,22 +1868,22 @@ function updatePlayer() {
     // Movement on sphere - change theta (longitude) and phi (latitude)
     let dTheta = 0, dPhi = 0;
     
-    // W/S moves forward/backward in the direction we're facing
-    // A/D strafes left/right
-    // yaw = 0 means facing "south" (increasing phi)
-    // yaw = PI/2 means facing "east" (increasing theta on equator)
+    // Camera forward direction uses: -sin(yaw) for theta, -cos(yaw) for phi
+    // Movement must match this direction
     if (keys['KeyW'] || keys['ArrowUp']) {
-        dTheta += Math.sin(yaw) * baseSpeed;
-        dPhi += Math.cos(yaw) * baseSpeed;
-    }
-    if (keys['KeyS'] || keys['ArrowDown']) {
         dTheta -= Math.sin(yaw) * baseSpeed;
         dPhi -= Math.cos(yaw) * baseSpeed;
     }
+    if (keys['KeyS'] || keys['ArrowDown']) {
+        dTheta += Math.sin(yaw) * baseSpeed;
+        dPhi += Math.cos(yaw) * baseSpeed;
+    }
+    // Strafe left = 90 degrees CCW from forward
     if (keys['KeyA'] || keys['ArrowLeft']) {
         dTheta -= Math.cos(yaw) * baseSpeed;
         dPhi += Math.sin(yaw) * baseSpeed;
     }
+    // Strafe right = 90 degrees CW from forward
     if (keys['KeyD'] || keys['ArrowRight']) {
         dTheta += Math.cos(yaw) * baseSpeed;
         dPhi -= Math.sin(yaw) * baseSpeed;

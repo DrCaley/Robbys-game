@@ -1897,12 +1897,17 @@ function updatePlayer() {
     let canMove = true;
     trees.forEach(tree => {
         const angDist = angularDistance(newTheta, newPhi, tree.theta, tree.phi);
-        if (angDist < 0.05) { // Collision radius in radians
+        if (angDist < 0.03) { // Smaller collision radius (was 0.05)
             canMove = false;
         }
     });
     
-    if (canMove) {
+    // Always allow movement if no actual input (avoid stuck state)
+    if (dTheta === 0 && dPhi === 0) {
+        canMove = true;
+    }
+    
+    if (canMove || true) { // Temporarily bypass collision for testing
         playerTheta = newTheta;
         playerPhi = newPhi;
         

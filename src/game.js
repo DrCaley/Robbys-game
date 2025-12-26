@@ -23,7 +23,7 @@ const ANIMALS = [
 
 // ===== GAME STATE =====
 let scene, camera, renderer;
-let player = { x: 0, y: 1.6, z: 0 };
+let player = { x: 0, y: 1.6, z: 0, theta: 0, phi: Math.PI / 2 };
 let velocity = { x: 0, z: 0 };
 let yaw = 0, pitch = 0;
 let keys = {};
@@ -37,8 +37,9 @@ let isPointerLocked = false;
 
 // Planet settings
 const PLANET_RADIUS = 50;
-let playerTheta = 0; // angle around Y axis (longitude)
-let playerPhi = Math.PI / 2; // angle from top (latitude, PI/2 = equator)
+// Player orientation stored as quaternion (avoids gimbal lock)
+let playerQuaternion = null; // Will be initialized when THREE.js loads
+let playerYaw = 0; // Local yaw relative to current orientation
 
 // Net state
 let net = null;
@@ -54,12 +55,20 @@ function initThree() {
     scene.background = new THREE.Color(0x5dade2); // Tropical blue sky
     // No fog for spherical world - you can see far
     
+    // Initialize player quaternion - start at "equator" facing "south"
+    // Player stands on sphere with local Y pointing outward (away from center)
+    // Start position: (PLANET_RADIUS, 0, 0) - on the +X axis
+    playerQuaternion = new THREE.Quaternion();
+    // Rotate so player's "up" (local Y) points in +X direction (outward from sphere at start pos)
+    playerQuaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+    playerYaw = 0;
+    
     // Camera (first person)
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     
-    // Position camera on the planet surface at the "equator"
-    const startPos = getPositionOnPlanet(playerTheta, playerPhi, 1.6);
-    camera.position.copy(startPos);
+    // Position camera on the planet surface
+    const startPos = getPlayerPosition();
+    camera.position.copy(startPos).add(getPlayerUp().multiplyScalar(1.6));
     scene.add(camera); // Add camera to scene so attached objects (like net) are visible
     
     // Renderer
@@ -199,15 +208,15 @@ function checkNetCatch() {
         if (animal.caught) return;
         
         // Check angular distance from animal to player
-        const distToPlayer = angularDistance(animal.theta, animal.phi, playerTheta, playerPhi);
+        const distToPlayer = angularDistance(animal.theta, animal.phi, player.theta, player.phi);
         
         // Animal must be within range
         if (distToPlayer > netRangeAngular * 1.5) return;
         
         // Check if animal is roughly in front of player
         // Calculate angle from player to animal in player's local coordinate system
-        const dTheta = animal.theta - playerTheta;
-        const dPhi = animal.phi - playerPhi;
+        const dTheta = animal.theta - player.theta;
+        const dPhi = animal.phi - player.phi;
         
         // When yaw=0, player faces direction of increasing phi (south)
         // atan2(x, y) where x is theta direction, y is phi direction
@@ -305,9 +314,48 @@ function sphericalToCartesian(theta, phi, radius) {
     );
 }
 
-// Get position on planet surface
+// Get position on planet surface (legacy - for trees/animals that still use theta/phi)
 function getPositionOnPlanet(theta, phi, height) {
     return sphericalToCartesian(theta, phi, PLANET_RADIUS + height);
+}
+
+// ===== QUATERNION-BASED PLAYER POSITION HELPERS =====
+
+// Get player's position on the sphere surface (world coordinates)
+function getPlayerPosition() {
+    // Player's local "up" (Y-axis) points outward from sphere center
+    // So position = up * PLANET_RADIUS
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(playerQuaternion);
+    return up.multiplyScalar(PLANET_RADIUS);
+}
+
+// Get player's up vector (points away from planet center)
+function getPlayerUp() {
+    return new THREE.Vector3(0, 1, 0).applyQuaternion(playerQuaternion);
+}
+
+// Get player's forward vector (tangent to sphere, based on yaw)
+function getPlayerForward() {
+    // Start with local -Z as forward, then apply yaw rotation around local Y
+    const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), playerYaw);
+    const localForward = new THREE.Vector3(0, 0, -1).applyQuaternion(yawQuat);
+    return localForward.applyQuaternion(playerQuaternion);
+}
+
+// Get player's right vector (tangent to sphere, perpendicular to forward)
+function getPlayerRight() {
+    const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), playerYaw);
+    const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(yawQuat);
+    return localRight.applyQuaternion(playerQuaternion);
+}
+
+// Convert world position to theta/phi (for collision checks with trees)
+function worldToSpherical(worldPos) {
+    const normalized = worldPos.clone().normalize();
+    const phi = Math.acos(Math.max(-1, Math.min(1, normalized.y)));
+    let theta = Math.atan2(normalized.z, normalized.x);
+    if (theta < 0) theta += Math.PI * 2;
+    return { theta, phi };
 }
 
 function createJungle() {
@@ -1746,7 +1794,7 @@ function createAnimals() {
         do {
             theta = Math.random() * Math.PI * 2;
             phi = Math.acos(2 * Math.random() - 1);
-        } while (angularDistance(theta, phi, playerTheta, playerPhi) < 0.3);
+        } while (angularDistance(theta, phi, player.theta, player.phi) < 0.3);
         
         animals.push(createAnimalOnSphere(type, theta, phi));
     }
@@ -1865,35 +1913,21 @@ function startGame() {
 }
 
 function updatePlayer() {
-    if (!gameRunning) return;
+    if (!gameRunning || !playerQuaternion) return;
     
-    const baseSpeed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.4 : 0.2;
+    const moveSpeed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.012 : 0.006;
+    const turnSpeed = 0.002;
     
-    // Get current position
-    const playerPos = getPositionOnPlanet(playerTheta, playerPhi, 0);
-    const upVector = playerPos.clone().normalize();
+    // Update yaw based on mouse movement (already handled in mousemove event)
+    // yaw is stored in the global 'yaw' variable
+    playerYaw = yaw;
     
-    // Calculate tangent vectors at current position
-    const tangentTheta = new THREE.Vector3(
-        -Math.sin(playerTheta),
-        0,
-        Math.cos(playerTheta)
-    ).normalize();
+    // Get movement directions from quaternion
+    const forward = getPlayerForward();
+    const right = getPlayerRight();
+    const up = getPlayerUp();
     
-    const tangentPhi = new THREE.Vector3(
-        -Math.cos(playerPhi) * Math.cos(playerTheta),
-        Math.sin(playerPhi),
-        -Math.cos(playerPhi) * Math.sin(playerTheta)
-    ).normalize();
-    
-    // Forward direction based on yaw (same as camera)
-    const forward = tangentTheta.clone().multiplyScalar(-Math.sin(yaw))
-        .add(tangentPhi.clone().multiplyScalar(-Math.cos(yaw))).normalize();
-    
-    // Right direction (perpendicular to forward and up)
-    const right = new THREE.Vector3().crossVectors(forward, upVector).normalize();
-    
-    // Calculate movement in world space
+    // Calculate movement
     let moveDir = new THREE.Vector3(0, 0, 0);
     
     if (keys['KeyW'] || keys['ArrowUp']) {
@@ -1910,73 +1944,56 @@ function updatePlayer() {
     }
     
     if (moveDir.length() > 0) {
-        moveDir.normalize().multiplyScalar(baseSpeed);
+        moveDir.normalize();
         
-        // Calculate new position in world space
-        const newWorldPos = playerPos.clone().add(moveDir);
+        // Movement is a rotation around an axis perpendicular to movement direction and up
+        // Axis = cross(up, moveDir) gives us the rotation axis
+        const rotationAxis = new THREE.Vector3().crossVectors(up, moveDir).normalize();
         
-        // Project back onto sphere and convert to theta/phi
-        newWorldPos.normalize().multiplyScalar(PLANET_RADIUS);
+        // Create rotation quaternion (small rotation around this axis)
+        const moveRotation = new THREE.Quaternion().setFromAxisAngle(rotationAxis, moveSpeed);
         
-        // Convert cartesian back to spherical
-        const newPhi = Math.acos(Math.max(-1, Math.min(1, newWorldPos.y / PLANET_RADIUS)));
-        let newTheta = Math.atan2(newWorldPos.z, newWorldPos.x);
-        if (newTheta < 0) newTheta += Math.PI * 2;
+        // Calculate new quaternion
+        const newQuaternion = moveRotation.clone().multiply(playerQuaternion);
         
-        // Clamp phi to avoid poles
-        const clampedPhi = Math.max(0.1, Math.min(Math.PI - 0.1, newPhi));
+        // Check collision before applying
+        const newUp = new THREE.Vector3(0, 1, 0).applyQuaternion(newQuaternion);
+        const newPos = newUp.clone().multiplyScalar(PLANET_RADIUS);
+        const newSpherical = worldToSpherical(newPos);
         
-        // Check tree collisions
         let canMove = true;
         trees.forEach(tree => {
-            const treeDist = angularDistance(newTheta, clampedPhi, tree.theta, tree.phi);
-            if (treeDist < 0.04) { // Collision radius in radians
+            const treeDist = angularDistance(newSpherical.theta, newSpherical.phi, tree.theta, tree.phi);
+            if (treeDist < 0.04) {
                 canMove = false;
             }
         });
         
-        // Update player position if no collision
         if (canMove) {
-            playerTheta = newTheta;
-            playerPhi = clampedPhi;
+            playerQuaternion.copy(newQuaternion);
+            playerQuaternion.normalize(); // Keep it normalized
         }
     }
     
-    // Update camera position on sphere (with eye height)
-    const finalPos = getPositionOnPlanet(playerTheta, playerPhi, 1.6);
-    camera.position.copy(finalPos);
+    // Update camera position (eye height above surface)
+    const playerPos = getPlayerPosition();
+    const eyeHeight = up.clone().multiplyScalar(1.6);
+    camera.position.copy(playerPos).add(eyeHeight);
     
-    // Camera orientation: up vector points away from planet center
-    const finalUp = finalPos.clone().normalize();
-    
-    // Recalculate tangent vectors at new position for camera
-    const newTangentTheta = new THREE.Vector3(
-        -Math.sin(playerTheta),
-        0,
-        Math.cos(playerTheta)
-    ).normalize();
-    
-    const newTangentPhi = new THREE.Vector3(
-        -Math.cos(playerPhi) * Math.cos(playerTheta),
-        Math.sin(playerPhi),
-        -Math.cos(playerPhi) * Math.sin(playerTheta)
-    ).normalize();
-    
-    // Camera forward direction based on yaw
-    const camForward = newTangentTheta.clone().multiplyScalar(-Math.sin(yaw))
-        .add(newTangentPhi.clone().multiplyScalar(-Math.cos(yaw)));
-    
-    // Apply pitch - positive pitch looks up
+    // Camera orientation
+    // Forward direction with pitch applied
+    const camForward = getPlayerForward();
     const lookDir = camForward.clone()
-        .add(finalUp.clone().multiplyScalar(Math.sin(pitch)));
+        .add(up.clone().multiplyScalar(Math.sin(pitch)));
     
-    const lookTarget = finalPos.clone().add(lookDir);
-    camera.up.copy(finalUp);
+    const lookTarget = camera.position.clone().add(lookDir);
+    camera.up.copy(up);
     camera.lookAt(lookTarget);
     
-    // Store player position for animal collision detection
-    player.theta = playerTheta;
-    player.phi = playerPhi;
+    // Store player spherical coordinates for systems that need them
+    const spherical = worldToSpherical(playerPos);
+    player.theta = spherical.theta;
+    player.phi = spherical.phi;
 }
 
 // Calculate angular distance between two points on sphere
@@ -2004,13 +2021,13 @@ function updateAnimals() {
         if (animal.caught) return;
         
         // Check if player is nearby using angular distance
-        const distToPlayer = angularDistance(animal.theta, animal.phi, playerTheta, playerPhi);
+        const distToPlayer = angularDistance(animal.theta, animal.phi, player.theta, player.phi);
         
         // Run away if player is close (angular distance < 0.3 radians ~= 15 units on r=50 sphere)
         if (distToPlayer < 0.3) {
             // Move away from player - increase angle difference
-            const dTheta = animal.theta - playerTheta;
-            const dPhi = animal.phi - playerPhi;
+            const dTheta = animal.theta - player.theta;
+            const dPhi = animal.phi - player.phi;
             const len = Math.sqrt(dTheta * dTheta + dPhi * dPhi);
             if (len > 0.01) {
                 animal.targetTheta = animal.theta + (dTheta / len) * 0.5;

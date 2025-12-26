@@ -1916,24 +1916,27 @@ function updatePlayer() {
     const upVector = playerPos.clone().normalize();
     
     // Calculate forward direction (tangent to sphere)
-    // We need to compute the local forward based on yaw
+    // tangentTheta goes around the "equator" at this latitude
+    // tangentPhi goes towards/away from the poles
     const tangentTheta = new THREE.Vector3(
-        Math.sin(playerPhi) * (-Math.sin(playerTheta)),
+        -Math.sin(playerTheta),
         0,
-        Math.sin(playerPhi) * Math.cos(playerTheta)
+        Math.cos(playerTheta)
     ).normalize();
     
+    // tangentPhi points "south" (towards increasing phi / south pole)
     const tangentPhi = new THREE.Vector3(
-        Math.cos(playerPhi) * Math.cos(playerTheta),
-        -Math.sin(playerPhi),
-        Math.cos(playerPhi) * Math.sin(playerTheta)
+        -Math.cos(playerPhi) * Math.cos(playerTheta),
+        Math.sin(playerPhi),
+        -Math.cos(playerPhi) * Math.sin(playerTheta)
     ).normalize();
     
     // Combine tangents based on yaw to get look direction
-    const forward = tangentTheta.clone().multiplyScalar(Math.sin(yaw))
-        .add(tangentPhi.clone().multiplyScalar(Math.cos(yaw)));
+    // yaw = 0 means looking in -Z direction on flat world, which is "south" on sphere
+    const forward = tangentTheta.clone().multiplyScalar(-Math.sin(yaw))
+        .add(tangentPhi.clone().multiplyScalar(-Math.cos(yaw)));
     
-    // Apply pitch
+    // Apply pitch - positive pitch looks up
     const lookDir = forward.clone()
         .add(upVector.clone().multiplyScalar(Math.sin(pitch)));
     

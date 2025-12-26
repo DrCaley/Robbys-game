@@ -35,6 +35,14 @@ let startTime = 0;
 let mouseX = 0, mouseY = 0;
 let isPointerLocked = false;
 
+// Planet settings
+const PLANET_RADIUS = 80;
+let playerLat = 0; // latitude angle (north/south)
+let playerLon = 0; // longitude angle (east/west)
+let playerUp = new THREE.Vector3(0, 1, 0);
+let playerForward = new THREE.Vector3(0, 0, -1);
+let playerRight = new THREE.Vector3(1, 0, 0);
+
 // Net state
 let net = null;
 let netSwinging = false;
@@ -184,30 +192,24 @@ function swingNet() {
 }
 
 function checkNetCatch() {
-    // Calculate where the net is pointing (in front of player)
-    const netReachX = player.x - Math.sin(yaw) * NET_CATCH_RANGE;
-    const netReachZ = player.z - Math.cos(yaw) * NET_CATCH_RANGE;
+    // Get player position on sphere surface
+    const playerPos = latLonToPosition(playerLat, playerLon, PLANET_RADIUS);
     
     animals.forEach(animal => {
         if (animal.caught) return;
         
-        // Check distance from animal to net swing area
-        const dx = animal.x - player.x;
-        const dz = animal.z - player.z;
-        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+        // Get animal position
+        const animalPos = latLonToPosition(animal.lat, animal.lon, PLANET_RADIUS);
+        
+        // Check 3D distance from animal to player
+        const distToPlayer = playerPos.distanceTo(animalPos);
         
         // Animal must be within range
         if (distToPlayer > NET_CATCH_RANGE) return;
         
-        // Check if animal is roughly in front of player (within ~60 degree cone)
-        const angleToAnimal = Math.atan2(-dx, -dz);
-        let angleDiff = angleToAnimal - yaw;
-        
-        // Normalize angle difference
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        
-        if (Math.abs(angleDiff) < Math.PI / 3) { // Within 60 degree cone
+        // For simplicity on a sphere, just check distance (animal in front cone is complex on sphere)
+        // If close enough, catch it!
+        if (distToPlayer < NET_CATCH_RANGE * 0.8) {
             catchAnimal(animal);
         }
     });
@@ -237,28 +239,20 @@ function updateNet() {
 }
 
 function createGround() {
-    // Main ground - rich jungle floor
-    const groundGeometry = new THREE.PlaneGeometry(200, 200, 50, 50);
+    // Create a spherical planet
+    const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 64, 64);
     
-    // Add some height variation
-    const vertices = groundGeometry.attributes.position.array;
-    for (let i = 0; i < vertices.length; i += 3) {
-        vertices[i + 2] = Math.sin(vertices[i] * 0.1) * Math.cos(vertices[i + 1] * 0.1) * 0.5;
-    }
-    groundGeometry.computeVertexNormals();
-    
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
+    const planetMaterial = new THREE.MeshStandardMaterial({ 
         color: 0x2e8b57, // Darker jungle green
         roughness: 0.9
     });
     
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+    planet.receiveShadow = true;
+    scene.add(planet);
     
-    // Add jungle plants and ferns
-    for (let i = 0; i < 600; i++) {
+    // Add jungle plants and ferns on the sphere surface
+    for (let i = 0; i < 800; i++) {
         const plantType = Math.random();
         let plant;
         
@@ -279,17 +273,35 @@ function createGround() {
             plant = new THREE.Mesh(flowerGeometry, flowerMaterial);
         }
         
-        plant.position.set(
-            (Math.random() - 0.5) * 180,
-            0.15,
-            (Math.random() - 0.5) * 180
-        );
+        // Position on sphere surface
+        const lat = (Math.random() - 0.5) * Math.PI;
+        const lon = Math.random() * Math.PI * 2;
+        const pos = latLonToPosition(lat, lon, PLANET_RADIUS + 0.15);
+        plant.position.copy(pos);
+        
+        // Orient to point outward from planet center
+        plant.lookAt(0, 0, 0);
+        plant.rotateX(Math.PI / 2);
+        
         plant.castShadow = true;
         scene.add(plant);
     }
 }
 
-function createPalmTree(x, z) {
+// Helper function to convert lat/lon to 3D position on sphere
+function latLonToPosition(lat, lon, radius) {
+    const x = radius * Math.cos(lat) * Math.sin(lon);
+    const y = radius * Math.sin(lat);
+    const z = radius * Math.cos(lat) * Math.cos(lon);
+    return new THREE.Vector3(x, y, z);
+}
+
+// Get the "up" vector at a position on the sphere (points away from center)
+function getUpAtPosition(position) {
+    return position.clone().normalize();
+}
+
+function createPalmTree(lat, lon) {
     const tree = new THREE.Group();
     
     // Curved trunk (palm tree style)
@@ -335,7 +347,13 @@ function createPalmTree(x, z) {
         tree.add(coconut);
     }
     
-    tree.position.set(x, 0, z);
+    // Position on sphere surface
+    const pos = latLonToPosition(lat, lon, PLANET_RADIUS);
+    tree.position.copy(pos);
+    
+    // Orient tree to point outward from planet center
+    tree.lookAt(0, 0, 0);
+    tree.rotateX(Math.PI); // Flip so tree points away from center
     
     // Random scale variation
     const scale = 0.8 + Math.random() * 0.4;
@@ -345,7 +363,7 @@ function createPalmTree(x, z) {
     trees.push({ mesh: tree, x: x, z: z, radius: 1 });
 }
 
-function createJungleTree(x, z) {
+function createJungleTree(lat, lon) {
     const tree = new THREE.Group();
     
     // Thick trunk
@@ -387,50 +405,53 @@ function createJungleTree(x, z) {
         tree.add(vine);
     }
     
-    tree.position.set(x, 0, z);
+    // Position on sphere surface
+    const pos = latLonToPosition(lat, lon, PLANET_RADIUS);
+    tree.position.copy(pos);
+    
+    // Orient tree to point outward from planet center
+    tree.lookAt(0, 0, 0);
+    tree.rotateX(Math.PI);
     
     const scale = 0.7 + Math.random() * 0.5;
     tree.scale.set(scale, scale, scale);
     
     scene.add(tree);
-    trees.push({ mesh: tree, x: x, z: z, radius: 1.5 });
+    trees.push({ mesh: tree, lat: lat, lon: lon, radius: 1.5 });
 }
 
 function createJungle() {
-    // Create palm trees and jungle trees
-    for (let i = 0; i < 120; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 10 + Math.random() * 80;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
+    // Create palm trees and jungle trees spread around the planet
+    for (let i = 0; i < 150; i++) {
+        const lat = (Math.random() - 0.5) * Math.PI * 0.9; // Avoid poles
+        const lon = Math.random() * Math.PI * 2;
         
-        // Don't place trees too close to center
-        if (Math.sqrt(x*x + z*z) > 8) {
-            if (Math.random() > 0.5) {
-                createPalmTree(x, z);
-            } else {
-                createJungleTree(x, z);
-            }
+        if (Math.random() > 0.5) {
+            createPalmTree(lat, lon);
+        } else {
+            createJungleTree(lat, lon);
         }
     }
     
     // Add some standalone vines hanging from nothing (atmosphere)
-    for (let i = 0; i < 30; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 15 + Math.random() * 60;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
+    for (let i = 0; i < 40; i++) {
+        const lat = (Math.random() - 0.5) * Math.PI * 0.9;
+        const lon = Math.random() * Math.PI * 2;
         
         const vineMaterial = new THREE.MeshStandardMaterial({ color: 0x2e8b57 });
         const vineLength = 4 + Math.random() * 6;
         const vineGeometry = new THREE.CylinderGeometry(0.04, 0.02, vineLength, 4);
         const vine = new THREE.Mesh(vineGeometry, vineMaterial);
-        vine.position.set(x, 8 - vineLength / 2, z);
+        // Position vine on sphere
+        const pos = latLonToPosition(lat, lon, PLANET_RADIUS + 8 - vineLength / 2);
+        vine.position.copy(pos);
+        vine.lookAt(0, 0, 0);
+        vine.rotateX(Math.PI / 2);
         scene.add(vine);
     }
 }
 
-function createAnimal(type, x, z) {
+function createAnimal(type, lat, lon) {
     const animal = new THREE.Group();
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: type.color });
     const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
@@ -438,9 +459,11 @@ function createAnimal(type, x, z) {
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
     const noseMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 });
     
+    let legs = null; // Will store leg references for animation
+    
     // Different animal shapes based on type
     switch(type.name) {
-        // Snakes
+        // Snakes (no legs)
         case 'Python':
             createPython(animal, bodyMaterial, darkMaterial);
             break;
@@ -450,56 +473,64 @@ function createAnimal(type, x, z) {
         case 'Viper':
             createViper(animal, bodyMaterial, darkMaterial);
             break;
-        // Mammals
+        // Mammals (with legs)
         case 'Fox':
-            createFox(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
+            legs = createFox(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
             break;
         case 'Wolf':
-            createWolf(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
+            legs = createWolf(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
             break;
         case 'Bear':
-            createBear(animal, bodyMaterial, darkMaterial, noseMaterial);
+            legs = createBear(animal, bodyMaterial, darkMaterial, noseMaterial);
             break;
         case 'Squirrel':
-            createSquirrel(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
+            legs = createSquirrel(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
             break;
         case 'Jaguar':
-            createJaguar(animal, bodyMaterial, darkMaterial, noseMaterial);
+            legs = createJaguar(animal, bodyMaterial, darkMaterial, noseMaterial);
             break;
         case 'Monkey':
-            createMonkey(animal, bodyMaterial, darkMaterial);
+            legs = createMonkey(animal, bodyMaterial, darkMaterial);
             break;
         case 'Parrot':
-            createParrot(animal, bodyMaterial, darkMaterial);
+            legs = createParrot(animal, bodyMaterial, darkMaterial);
             break;
         case 'Toucan':
-            createToucan(animal, bodyMaterial, darkMaterial);
+            legs = createToucan(animal, bodyMaterial, darkMaterial);
             break;
         case 'Frog':
-            createFrog(animal, bodyMaterial, darkMaterial);
+            legs = createFrog(animal, bodyMaterial, darkMaterial);
             break;
         case 'Gorilla':
-            createGorilla(animal, bodyMaterial, darkMaterial);
+            legs = createGorilla(animal, bodyMaterial, darkMaterial);
             break;
         case 'Tiger':
-            createTiger(animal, bodyMaterial, darkMaterial, whiteMaterial);
+            legs = createTiger(animal, bodyMaterial, darkMaterial, whiteMaterial);
             break;
         default:
-            createGenericAnimal(animal, bodyMaterial, darkMaterial);
+            legs = createGenericAnimal(animal, bodyMaterial, darkMaterial);
     }
     
-    animal.position.set(x, 0, z);
+    // Position on sphere surface
+    const pos = latLonToPosition(lat, lon, PLANET_RADIUS);
+    animal.position.copy(pos);
+    
+    // Orient to stand on sphere (looking away from center, then flip)
+    animal.lookAt(0, 0, 0);
+    animal.rotateX(Math.PI / 2); // Stand upright on sphere
+    
     scene.add(animal);
     
     return {
         mesh: animal,
         type: type,
-        x: x,
-        z: z,
-        targetX: x,
-        targetZ: z,
+        lat: lat,
+        lon: lon,
+        targetLat: lat,
+        targetLon: lon,
         caught: false,
-        moveTimer: 0
+        moveTimer: 0,
+        legs: legs // Store leg references for animation
     };
 }
 
@@ -1062,8 +1093,8 @@ function createFox(animal, bodyMat, whiteMat, darkMat, noseMat) {
     // Eyes
     addEyes(animal, darkMat, 0.04, 0.58, 0.65, 0.08);
     
-    // Legs
-    addLegs(animal, bodyMat, 0.05, 0.35, 0.2, 0.25);
+    // Legs - return for animation
+    const legs = addLegs(animal, bodyMat, 0.05, 0.35, 0.2, 0.25);
     
     // Fluffy tail
     const tail = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), bodyMat);
@@ -1073,6 +1104,8 @@ function createFox(animal, bodyMat, whiteMat, darkMat, noseMat) {
     const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), whiteMat);
     tailTip.position.set(0, 0.35, -0.8);
     animal.add(tailTip);
+    
+    return legs;
 }
 
 function createWolf(animal, bodyMat, whiteMat, darkMat, noseMat) {
@@ -1118,14 +1151,16 @@ function createWolf(animal, bodyMat, whiteMat, darkMat, noseMat) {
     const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
     addEyes(animal, yellowMat, 0.04, 0.68, 0.65, 0.08);
     
-    // Legs
-    addLegs(animal, bodyMat, 0.06, 0.4, 0.22, 0.3);
+    // Legs - return for animation
+    const legs = addLegs(animal, bodyMat, 0.06, 0.4, 0.22, 0.3);
     
     // Bushy tail
     const tail = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), bodyMat);
     tail.scale.set(0.5, 0.5, 1.2);
     tail.position.set(0, 0.45, -0.55);
     animal.add(tail);
+    
+    return legs;
 }
 
 function createBear(animal, bodyMat, darkMat, noseMat) {
@@ -1164,8 +1199,8 @@ function createBear(animal, bodyMat, darkMat, noseMat) {
     // Eyes
     addEyes(animal, darkMat, 0.04, 0.9, 0.7, 0.12);
     
-    // Chunky legs
-    addLegs(animal, bodyMat, 0.12, 0.4, 0.3, 0.35);
+    // Chunky legs - return for animation
+    return addLegs(animal, bodyMat, 0.12, 0.4, 0.3, 0.35);
 }
 
 function createSquirrel(animal, bodyMat, whiteMat, darkMat, noseMat) {
@@ -1203,8 +1238,8 @@ function createSquirrel(animal, bodyMat, whiteMat, darkMat, noseMat) {
     // Big eyes
     addEyes(animal, darkMat, 0.035, 0.43, 0.25, 0.06);
     
-    // Tiny legs
-    addLegs(animal, bodyMat, 0.03, 0.15, 0.1, 0.1);
+    // Tiny legs - return for animation
+    const legs = addLegs(animal, bodyMat, 0.03, 0.15, 0.1, 0.1);
     
     // HUGE fluffy tail
     const tailBase = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), bodyMat);
@@ -1218,6 +1253,8 @@ function createSquirrel(animal, bodyMat, whiteMat, darkMat, noseMat) {
     const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), bodyMat);
     tailTip.position.set(0, 0.75, -0.2);
     animal.add(tailTip);
+    
+    return legs;
 }
 
 function createJaguar(animal, bodyMat, darkMat, noseMat) {
@@ -1271,14 +1308,16 @@ function createJaguar(animal, bodyMat, darkMat, noseMat) {
     const greenMat = new THREE.MeshStandardMaterial({ color: 0x90ee90 });
     addEyes(animal, greenMat, 0.04, 0.63, 0.7, 0.1);
     
-    // Strong legs
-    addLegs(animal, bodyMat, 0.07, 0.4, 0.25, 0.35);
+    // Strong legs - return for animation
+    const legs = addLegs(animal, bodyMat, 0.07, 0.4, 0.25, 0.35);
     
     // Long tail
     const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.8, 8), bodyMat);
     tail.rotation.x = Math.PI / 3;
     tail.position.set(0, 0.4, -0.7);
     animal.add(tail);
+    
+    return legs;
 }
 
 function createMonkey(animal, bodyMat, darkMat) {
@@ -1329,14 +1368,16 @@ function createMonkey(animal, bodyMat, darkMat) {
     rightArm.rotation.z = -0.5;
     animal.add(rightArm);
     
-    // Legs
-    addLegs(animal, bodyMat, 0.05, 0.25, 0.12, 0.1);
+    // Legs - return for animation
+    const legs = addLegs(animal, bodyMat, 0.05, 0.25, 0.12, 0.1);
     
     // Curly tail
     const tail = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.03, 8, 16, Math.PI * 1.5), bodyMat);
     tail.position.set(0, 0.3, -0.25);
     tail.rotation.y = Math.PI / 2;
     animal.add(tail);
+    
+    return legs;
 }
 
 function createParrot(animal, bodyMat, darkMat) {
@@ -1387,7 +1428,7 @@ function createParrot(animal, bodyMat, darkMat) {
         animal.add(feather);
     }
     
-    // Feet
+    // Feet (no animated legs for birds)
     const feetMat = new THREE.MeshStandardMaterial({ color: 0x666666 });
     const leftFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
     leftFoot.position.set(-0.08, 0.05, 0.05);
@@ -1395,6 +1436,8 @@ function createParrot(animal, bodyMat, darkMat) {
     const rightFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
     rightFoot.position.set(0.08, 0.05, 0.05);
     animal.add(rightFoot);
+    
+    return null; // Birds don't have animatable legs
 }
 
 function createToucan(animal, bodyMat, darkMat) {
@@ -1449,7 +1492,7 @@ function createToucan(animal, bodyMat, darkMat) {
     tail.rotation.x = 0.3;
     animal.add(tail);
     
-    // Feet
+    // Feet (no animated legs for birds)
     const feetMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
     const leftFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
     leftFoot.position.set(-0.08, 0.05, 0.05);
@@ -1457,6 +1500,8 @@ function createToucan(animal, bodyMat, darkMat) {
     const rightFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
     rightFoot.position.set(0.08, 0.05, 0.05);
     animal.add(rightFoot);
+    
+    return null; // Birds don't have animatable legs
 }
 
 function createFrog(animal, bodyMat, darkMat) {
@@ -1513,6 +1558,8 @@ function createFrog(animal, bodyMat, darkMat) {
     rightFront.position.set(0.15, 0.08, 0.15);
     rightFront.rotation.z = -0.3;
     animal.add(rightFront);
+    
+    return null; // Frog has special legs, not standard animated
 }
 
 function createGorilla(animal, bodyMat, darkMat) {
@@ -1564,8 +1611,8 @@ function createGorilla(animal, bodyMat, darkMat) {
     rightArm.rotation.z = -0.8;
     animal.add(rightArm);
     
-    // Legs
-    addLegs(animal, bodyMat, 0.1, 0.35, 0.25, 0.15);
+    // Legs - return for animation
+    return addLegs(animal, bodyMat, 0.1, 0.35, 0.25, 0.15);
 }
 
 function createTiger(animal, bodyMat, darkMat, whiteMat) {
@@ -1621,14 +1668,16 @@ function createTiger(animal, bodyMat, darkMat, whiteMat) {
     const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
     addEyes(animal, yellowMat, 0.04, 0.68, 0.7, 0.12);
     
-    // Strong legs
-    addLegs(animal, bodyMat, 0.08, 0.4, 0.25, 0.35);
+    // Strong legs - return for animation
+    const legs = addLegs(animal, bodyMat, 0.08, 0.4, 0.25, 0.35);
     
     // Long tail with stripes
     const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.7, 8), bodyMat);
     tail.rotation.x = Math.PI / 4;
     tail.position.set(0, 0.45, -0.65);
     animal.add(tail);
+    
+    return legs;
 }
 
 function createGenericAnimal(animal, bodyMat, darkMat) {
@@ -1642,7 +1691,7 @@ function createGenericAnimal(animal, bodyMat, darkMat) {
     animal.add(head);
     
     addEyes(animal, darkMat, 0.04, 0.65, 0.5, 0.1);
-    addLegs(animal, bodyMat, 0.06, 0.3, 0.2, 0.2);
+    return addLegs(animal, bodyMat, 0.06, 0.3, 0.2, 0.2);
 }
 
 // Helper functions
@@ -1656,68 +1705,107 @@ function addEyes(animal, mat, size, y, z, spacing) {
     animal.add(rightEye);
 }
 
+// Returns array of leg meshes for animation
 function addLegs(animal, mat, radius, height, xSpread, zSpread) {
     const legGeo = new THREE.CylinderGeometry(radius, radius, height, 8);
+    const legs = [];
     const positions = [
-        [-xSpread, height/2, zSpread],
-        [xSpread, height/2, zSpread],
-        [-xSpread, height/2, -zSpread],
-        [xSpread, height/2, -zSpread]
+        { pos: [-xSpread, height/2, zSpread], isFront: true, isLeft: true },
+        { pos: [xSpread, height/2, zSpread], isFront: true, isLeft: false },
+        { pos: [-xSpread, height/2, -zSpread], isFront: false, isLeft: true },
+        { pos: [xSpread, height/2, -zSpread], isFront: false, isLeft: false }
     ];
-    positions.forEach(pos => {
+    positions.forEach(legData => {
+        // Create a pivot at ground level for rotation
+        const legPivot = new THREE.Group();
+        legPivot.position.set(legData.pos[0], 0, legData.pos[2]);
+        
         const leg = new THREE.Mesh(legGeo, mat);
-        leg.position.set(...pos);
-        animal.add(leg);
+        leg.position.set(0, height/2, 0);
+        legPivot.add(leg);
+        
+        animal.add(legPivot);
+        legs.push({ pivot: legPivot, isFront: legData.isFront, isLeft: legData.isLeft });
     });
+    return legs;
 }
+
 function createAnimals() {
     animals = [];
     
-    // Create 10 random animals
+    // Create 10 random animals spread around the planet
     for (let i = 0; i < 10; i++) {
         const type = ANIMALS[i % ANIMALS.length];
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 15 + Math.random() * 50;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
+        const lat = (Math.random() - 0.5) * Math.PI * 0.8; // Avoid poles
+        const lon = Math.random() * Math.PI * 2;
         
-        animals.push(createAnimal(type, x, z));
+        animals.push(createAnimal(type, lat, lon));
     }
 }
 
 function createSky() {
-    // Sun
-    const sunGeometry = new THREE.SphereGeometry(5, 32, 32);
+    // Sun - positioned far from the planet
+    const sunGeometry = new THREE.SphereGeometry(15, 32, 32);
     const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
     const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-    sun.position.set(50, 80, 50);
+    sun.position.set(200, 150, 200);
     scene.add(sun);
     
-    // Clouds
-    for (let i = 0; i < 20; i++) {
+    // Space background (dark blue sphere around everything)
+    const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+    const skyMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x1a1a3e,
+        side: THREE.BackSide
+    });
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    scene.add(sky);
+    
+    // Stars
+    const starGeometry = new THREE.BufferGeometry();
+    const starPositions = [];
+    for (let i = 0; i < 1000; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = 450;
+        starPositions.push(
+            r * Math.sin(phi) * Math.cos(theta),
+            r * Math.sin(phi) * Math.sin(theta),
+            r * Math.cos(phi)
+        );
+    }
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+    const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1 });
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+    
+    // Clouds around the planet
+    for (let i = 0; i < 30; i++) {
         const cloudGroup = new THREE.Group();
         
         for (let j = 0; j < 5; j++) {
-            const cloudGeometry = new THREE.SphereGeometry(2 + Math.random() * 3, 16, 16);
+            const cloudGeometry = new THREE.SphereGeometry(1.5 + Math.random() * 2, 16, 16);
             const cloudMaterial = new THREE.MeshStandardMaterial({ 
                 color: 0xffffff,
                 transparent: true,
-                opacity: 0.9
+                opacity: 0.8
             });
             const cloudPart = new THREE.Mesh(cloudGeometry, cloudMaterial);
             cloudPart.position.set(
-                (Math.random() - 0.5) * 8,
-                (Math.random() - 0.5) * 2,
-                (Math.random() - 0.5) * 4
+                (Math.random() - 0.5) * 6,
+                (Math.random() - 0.5) * 1.5,
+                (Math.random() - 0.5) * 3
             );
             cloudGroup.add(cloudPart);
         }
         
-        cloudGroup.position.set(
-            (Math.random() - 0.5) * 200,
-            40 + Math.random() * 20,
-            (Math.random() - 0.5) * 200
-        );
+        // Position cloud on sphere surface at altitude
+        const lat = (Math.random() - 0.5) * Math.PI * 0.8;
+        const lon = Math.random() * Math.PI * 2;
+        const cloudAltitude = PLANET_RADIUS + 15 + Math.random() * 10;
+        const cloudPos = latLonToPosition(lat, lon, cloudAltitude);
+        cloudGroup.position.copy(cloudPos);
+        cloudGroup.lookAt(0, 0, 0);
+        
         scene.add(cloudGroup);
     }
 }
@@ -1747,118 +1835,160 @@ function startGame() {
 function updatePlayer() {
     if (!gameRunning) return;
     
-    const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.2 : 0.1;
+    const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.004 : 0.002;
     
-    // Get movement direction based on camera yaw
-    let moveX = 0, moveZ = 0;
+    // Calculate movement in spherical coordinates
+    let deltaLat = 0, deltaLon = 0;
     
+    // Get player's forward direction based on yaw (relative to north/south)
     if (keys['KeyW'] || keys['ArrowUp']) {
-        moveX -= Math.sin(yaw) * speed;
-        moveZ -= Math.cos(yaw) * speed;
+        deltaLat += Math.cos(yaw) * speed;
+        deltaLon -= Math.sin(yaw) * speed / Math.cos(playerLat + 0.0001); // Adjust for latitude
     }
     if (keys['KeyS'] || keys['ArrowDown']) {
-        moveX += Math.sin(yaw) * speed;
-        moveZ += Math.cos(yaw) * speed;
+        deltaLat -= Math.cos(yaw) * speed;
+        deltaLon += Math.sin(yaw) * speed / Math.cos(playerLat + 0.0001);
     }
     if (keys['KeyA'] || keys['ArrowLeft']) {
-        moveX -= Math.cos(yaw) * speed;
-        moveZ += Math.sin(yaw) * speed;
+        deltaLat += Math.sin(yaw) * speed;
+        deltaLon += Math.cos(yaw) * speed / Math.cos(playerLat + 0.0001);
     }
     if (keys['KeyD'] || keys['ArrowRight']) {
-        moveX += Math.cos(yaw) * speed;
-        moveZ -= Math.sin(yaw) * speed;
+        deltaLat -= Math.sin(yaw) * speed;
+        deltaLon -= Math.cos(yaw) * speed / Math.cos(playerLat + 0.0001);
     }
     
-    // Apply movement with collision check
-    const newX = player.x + moveX;
-    const newZ = player.z + moveZ;
+    // Apply movement (wrap around the sphere)
+    playerLat += deltaLat;
+    playerLon += deltaLon;
     
-    // Check tree collisions
-    let canMove = true;
-    trees.forEach(tree => {
-        const dx = newX - tree.x;
-        const dz = newZ - tree.z;
-        const dist = Math.sqrt(dx*dx + dz*dz);
-        if (dist < tree.radius + 0.5) {
-            canMove = false;
-        }
-    });
+    // Clamp latitude to avoid poles (causes singularity)
+    playerLat = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, playerLat));
     
-    // Keep player in bounds
-    if (Math.abs(newX) > 95 || Math.abs(newZ) > 95) {
-        canMove = false;
+    // Wrap longitude
+    if (playerLon > Math.PI) playerLon -= Math.PI * 2;
+    if (playerLon < -Math.PI) playerLon += Math.PI * 2;
+    
+    // Calculate player position on sphere surface (slightly above ground)
+    const playerPos = latLonToPosition(playerLat, playerLon, PLANET_RADIUS + 1.6);
+    player.x = playerPos.x;
+    player.y = playerPos.y;
+    player.z = playerPos.z;
+    
+    // Calculate up vector (away from center)
+    playerUp = playerPos.clone().normalize();
+    
+    // Calculate forward and right vectors for camera orientation
+    // Forward is tangent to sphere in "north" direction at current position
+    const northPole = new THREE.Vector3(0, 1, 0);
+    playerForward = new THREE.Vector3().crossVectors(playerUp, northPole).normalize();
+    if (playerForward.length() < 0.1) {
+        playerForward.set(1, 0, 0);
     }
+    playerRight = new THREE.Vector3().crossVectors(playerForward, playerUp).normalize();
     
-    if (canMove) {
-        player.x = newX;
-        player.z = newZ;
-    }
+    // Update camera position and orientation
+    camera.position.copy(playerPos);
     
-    // Update camera
-    camera.position.set(player.x, player.y, player.z);
-    camera.rotation.order = 'YXZ';
-    camera.rotation.y = yaw;
-    camera.rotation.x = pitch;
+    // Create rotation matrix for camera orientation on sphere
+    const lookTarget = playerPos.clone().add(
+        playerForward.clone().multiplyScalar(Math.cos(yaw)).add(
+            playerRight.clone().multiplyScalar(-Math.sin(yaw))
+        )
+    );
+    
+    // Adjust for pitch
+    lookTarget.add(playerUp.clone().multiplyScalar(Math.sin(pitch)));
+    
+    camera.up.copy(playerUp);
+    camera.lookAt(lookTarget);
 }
 
 function updateAnimals() {
+    const time = Date.now();
+    
     animals.forEach(animal => {
         if (animal.caught) return;
         
-        // Check if player is nearby
-        const dx = player.x - animal.x;
-        const dz = player.z - animal.z;
-        const distToPlayer = Math.sqrt(dx*dx + dz*dz);
+        // Calculate distance to player using spherical distance
+        const animalPos = latLonToPosition(animal.lat, animal.lon, PLANET_RADIUS);
+        const playerPosGround = latLonToPosition(playerLat, playerLon, PLANET_RADIUS);
+        const distToPlayer = animalPos.distanceTo(playerPosGround);
         
-        // Run away if player is close (removed auto-catch - must use net!)
+        // Run away if player is close
         if (distToPlayer < 15) {
-            // Move away from player
-            const angle = Math.atan2(animal.z - player.z, animal.x - player.x);
-            animal.targetX = animal.x + Math.cos(angle) * 20;
-            animal.targetZ = animal.z + Math.sin(angle) * 20;
+            // Move away from player in spherical coords
+            const dLat = animal.lat - playerLat;
+            const dLon = animal.lon - playerLon;
+            const angle = Math.atan2(dLon, dLat);
+            animal.targetLat = animal.lat + Math.cos(angle) * 0.3;
+            animal.targetLon = animal.lon + Math.sin(angle) * 0.3;
         } else {
             // Wander randomly
             animal.moveTimer--;
             if (animal.moveTimer <= 0) {
-                animal.targetX = animal.x + (Math.random() - 0.5) * 20;
-                animal.targetZ = animal.z + (Math.random() - 0.5) * 20;
+                animal.targetLat = animal.lat + (Math.random() - 0.5) * 0.2;
+                animal.targetLon = animal.lon + (Math.random() - 0.5) * 0.2;
                 animal.moveTimer = 60 + Math.random() * 120;
             }
         }
         
-        // Keep animals in bounds
-        animal.targetX = Math.max(-90, Math.min(90, animal.targetX));
-        animal.targetZ = Math.max(-90, Math.min(90, animal.targetZ));
+        // Clamp to avoid poles
+        animal.targetLat = Math.max(-Math.PI * 0.4, Math.min(Math.PI * 0.4, animal.targetLat));
+        
+        // Wrap longitude
+        if (animal.targetLon > Math.PI) animal.targetLon -= Math.PI * 2;
+        if (animal.targetLon < -Math.PI) animal.targetLon += Math.PI * 2;
         
         // Move towards target
-        const toTargetX = animal.targetX - animal.x;
-        const toTargetZ = animal.targetZ - animal.z;
-        const distToTarget = Math.sqrt(toTargetX*toTargetX + toTargetZ*toTargetZ);
+        const toTargetLat = animal.targetLat - animal.lat;
+        const toTargetLon = animal.targetLon - animal.lon;
+        const distToTarget = Math.sqrt(toTargetLat * toTargetLat + toTargetLon * toTargetLon);
         
-        if (distToTarget > 0.5) {
-            const speed = distToPlayer < 15 ? animal.type.speed * 1.5 : animal.type.speed;
-            animal.x += (toTargetX / distToTarget) * speed;
-            animal.z += (toTargetZ / distToTarget) * speed;
-            
-            // Check tree collisions
-            trees.forEach(tree => {
-                const tdx = animal.x - tree.x;
-                const tdz = animal.z - tree.z;
-                const tdist = Math.sqrt(tdx*tdx + tdz*tdz);
-                if (tdist < tree.radius + 0.5) {
-                    animal.x = tree.x + (tdx / tdist) * (tree.radius + 0.6);
-                    animal.z = tree.z + (tdz / tdist) * (tree.radius + 0.6);
-                    animal.targetX = animal.x + (Math.random() - 0.5) * 10;
-                    animal.targetZ = animal.z + (Math.random() - 0.5) * 10;
-                }
-            });
-            
-            // Face movement direction
-            animal.mesh.rotation.y = Math.atan2(toTargetX, toTargetZ);
+        const isMoving = distToTarget > 0.01;
+        
+        if (isMoving) {
+            const speed = distToPlayer < 15 ? animal.type.speed * 0.003 : animal.type.speed * 0.002;
+            animal.lat += (toTargetLat / distToTarget) * speed;
+            animal.lon += (toTargetLon / distToTarget) * speed;
         }
         
-        // Animate bobbing (keep snakes above ground - base height 0.1 + small bob)
-        animal.mesh.position.set(animal.x, 0.15 + Math.sin(Date.now() * 0.005) * 0.05, animal.z);
+        // Update mesh position on sphere surface
+        const newPos = latLonToPosition(animal.lat, animal.lon, PLANET_RADIUS);
+        const bobAmount = animal.type.type === 'snake' ? 0.02 : 0.05;
+        const heightOffset = 0.15 + Math.sin(time * 0.005) * bobAmount;
+        
+        // Position slightly above sphere surface
+        const upDir = newPos.clone().normalize();
+        animal.mesh.position.copy(newPos.clone().add(upDir.clone().multiplyScalar(heightOffset)));
+        
+        // Orient animal to stand on sphere
+        animal.mesh.lookAt(0, 0, 0);
+        animal.mesh.rotateX(Math.PI / 2);
+        
+        // Face movement direction (rotate around local Y axis)
+        if (isMoving) {
+            const moveAngle = Math.atan2(toTargetLon, toTargetLat);
+            animal.mesh.rotateY(moveAngle);
+        }
+        
+        // Animate legs if animal has them and is moving
+        if (animal.legs && isMoving) {
+            const legSpeed = 8 * animal.type.speed;
+            animal.legs.forEach(leg => {
+                // Alternate front/back legs
+                const phase = leg.isFront ? 0 : Math.PI;
+                // Left and right legs are opposite
+                const sidePhase = leg.isLeft ? 0 : Math.PI;
+                const swingAngle = Math.sin(time * legSpeed + phase + sidePhase) * 0.4;
+                leg.pivot.rotation.x = swingAngle;
+            });
+        } else if (animal.legs) {
+            // Reset legs when standing still
+            animal.legs.forEach(leg => {
+                leg.pivot.rotation.x = 0;
+            });
+        }
     });
 }
 

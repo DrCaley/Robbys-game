@@ -398,13 +398,15 @@ function createPalmTreeOnSphere(theta, phi) {
         tree.add(coconut);
     }
     
-    // Position on sphere and orient to point outward
+    // Position on sphere and orient to point outward from center
     const pos = getPositionOnPlanet(theta, phi, 0);
     tree.position.copy(pos);
     
-    // Orient tree to point away from planet center
-    tree.lookAt(0, 0, 0);
-    tree.rotateX(Math.PI); // Flip so tree points outward
+    // Orient tree so its Y-axis points away from planet center
+    const up = pos.clone().normalize();
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
+    tree.quaternion.copy(quaternion);
     
     // Random scale variation
     const scale = 0.8 + Math.random() * 0.4;
@@ -457,13 +459,15 @@ function createJungleTreeOnSphere(theta, phi) {
         tree.add(vine);
     }
     
-    // Position on sphere and orient to point outward
+    // Position on sphere and orient to point outward from center
     const pos = getPositionOnPlanet(theta, phi, 0);
     tree.position.copy(pos);
     
-    // Orient tree to point away from planet center
-    tree.lookAt(0, 0, 0);
-    tree.rotateX(Math.PI); // Flip so tree points outward
+    // Orient tree so its Y-axis points away from planet center
+    const up = pos.clone().normalize();
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
+    tree.quaternion.copy(quaternion);
     
     const scale = 0.7 + Math.random() * 0.5;
     tree.scale.set(scale, scale, scale);
@@ -1922,9 +1926,20 @@ function updatePlayer() {
         // Clamp phi to avoid poles
         const clampedPhi = Math.max(0.1, Math.min(Math.PI - 0.1, newPhi));
         
-        // Update player position
-        playerTheta = newTheta;
-        playerPhi = clampedPhi;
+        // Check tree collisions
+        let canMove = true;
+        trees.forEach(tree => {
+            const treeDist = angularDistance(newTheta, clampedPhi, tree.theta, tree.phi);
+            if (treeDist < 0.04) { // Collision radius in radians
+                canMove = false;
+            }
+        });
+        
+        // Update player position if no collision
+        if (canMove) {
+            playerTheta = newTheta;
+            playerPhi = clampedPhi;
+        }
     }
     
     // Update camera position on sphere (with eye height)

@@ -1867,16 +1867,18 @@ function updatePlayer() {
     // Movement on sphere - change theta (longitude) and phi (latitude)
     let dTheta = 0, dPhi = 0;
     
-    // Forward/backward moves along the look direction (yaw affects theta vs phi blend)
+    // W/S moves forward/backward in the direction we're facing
+    // A/D strafes left/right
+    // yaw = 0 means facing "south" (increasing phi)
+    // yaw = PI/2 means facing "east" (increasing theta on equator)
     if (keys['KeyW'] || keys['ArrowUp']) {
-        dTheta -= Math.sin(yaw) * baseSpeed;
-        dPhi -= Math.cos(yaw) * baseSpeed;
-    }
-    if (keys['KeyS'] || keys['ArrowDown']) {
         dTheta += Math.sin(yaw) * baseSpeed;
         dPhi += Math.cos(yaw) * baseSpeed;
     }
-    // Strafe moves perpendicular to look direction
+    if (keys['KeyS'] || keys['ArrowDown']) {
+        dTheta -= Math.sin(yaw) * baseSpeed;
+        dPhi -= Math.cos(yaw) * baseSpeed;
+    }
     if (keys['KeyA'] || keys['ArrowLeft']) {
         dTheta -= Math.cos(yaw) * baseSpeed;
         dPhi += Math.sin(yaw) * baseSpeed;

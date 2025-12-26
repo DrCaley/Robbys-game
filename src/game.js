@@ -1209,8 +1209,8 @@ function updateAnimals() {
             animal.mesh.rotation.y = Math.atan2(toTargetX, toTargetZ);
         }
         
-        // Animate bobbing
-        animal.mesh.position.set(animal.x, Math.sin(Date.now() * 0.01) * 0.1, animal.z);
+        // Animate bobbing (keep snakes above ground - base height 0.1 + small bob)
+        animal.mesh.position.set(animal.x, 0.15 + Math.sin(Date.now() * 0.005) * 0.05, animal.z);
     });
 }
 

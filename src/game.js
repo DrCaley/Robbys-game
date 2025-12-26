@@ -54,8 +54,8 @@ const NET_CATCH_RANGE = 4; // how far the net reaches
 function initThree() {
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x5dade2); // Tropical blue sky
-    scene.fog = new THREE.Fog(0x5dade2, 30, 150);
+    scene.background = new THREE.Color(0x1a1a3e); // Dark space background
+    // No fog for now - planet is in space!
     
     // Initialize player direction vectors
     playerUp = new THREE.Vector3(0, 1, 0);
@@ -64,7 +64,6 @@ function initThree() {
     
     // Camera (first person)
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.6, 0);
     scene.add(camera); // Add camera to scene so attached objects (like net) are visible
     
     // Renderer
@@ -1839,6 +1838,8 @@ function startGame() {
     player.y = startPos.y;
     player.z = startPos.z;
     camera.position.copy(startPos);
+    console.log('Camera start position:', startPos.x, startPos.y, startPos.z);
+    console.log('Planet radius:', PLANET_RADIUS);
     
     // Set initial camera orientation (looking tangent to sphere)
     playerUp = startPos.clone().normalize();
@@ -1850,6 +1851,7 @@ function startGame() {
     playerRight = new THREE.Vector3().crossVectors(playerForward, playerUp).normalize();
     camera.up.copy(playerUp);
     camera.lookAt(startPos.clone().add(playerForward));
+    console.log('Camera looking at:', playerForward.x, playerForward.y, playerForward.z);
     
     // Request pointer lock
     document.getElementById('game-canvas').requestPointerLock();

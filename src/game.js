@@ -35,6 +35,11 @@ let startTime = 0;
 let mouseX = 0, mouseY = 0;
 let isPointerLocked = false;
 
+// Planet settings
+const PLANET_RADIUS = 50;
+let playerTheta = 0; // angle around Y axis (longitude)
+let playerPhi = Math.PI / 2; // angle from top (latitude, PI/2 = equator)
+
 // Net state
 let net = null;
 let netSwinging = false;
@@ -47,11 +52,14 @@ function initThree() {
     // Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x5dade2); // Tropical blue sky
-    scene.fog = new THREE.Fog(0x5dade2, 30, 100);
+    // No fog for spherical world - you can see far
     
     // Camera (first person)
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.6, 0);
+    
+    // Position camera on the planet surface at the "equator"
+    const startPos = getPositionOnPlanet(playerTheta, playerPhi, 1.6);
+    camera.position.copy(startPos);
     scene.add(camera); // Add camera to scene so attached objects (like net) are visible
     
     // Renderer
@@ -184,23 +192,25 @@ function swingNet() {
 }
 
 function checkNetCatch() {
-    // Calculate where the net is pointing (in front of player)
-    const netReachX = player.x - Math.sin(yaw) * NET_CATCH_RANGE;
-    const netReachZ = player.z - Math.cos(yaw) * NET_CATCH_RANGE;
+    // Net catch range in angular distance (radians)
+    const netRangeAngular = NET_CATCH_RANGE / PLANET_RADIUS; // ~0.06 radians for range 3 on r=50
     
     animals.forEach(animal => {
         if (animal.caught) return;
         
-        // Check distance from animal to net swing area
-        const dx = animal.x - player.x;
-        const dz = animal.z - player.z;
-        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+        // Check angular distance from animal to player
+        const distToPlayer = angularDistance(animal.theta, animal.phi, playerTheta, playerPhi);
         
         // Animal must be within range
-        if (distToPlayer > NET_CATCH_RANGE) return;
+        if (distToPlayer > netRangeAngular * 1.5) return;
         
-        // Check if animal is roughly in front of player (within ~60 degree cone)
-        const angleToAnimal = Math.atan2(-dx, -dz);
+        // Check if animal is roughly in front of player
+        // Calculate angle from player to animal in player's local coordinate system
+        const dTheta = animal.theta - playerTheta;
+        const dPhi = animal.phi - playerPhi;
+        
+        // Simple approximation: check if the direction to animal aligns with yaw
+        const angleToAnimal = Math.atan2(dTheta, -dPhi);
         let angleDiff = angleToAnimal - yaw;
         
         // Normalize angle difference
@@ -237,28 +247,19 @@ function updateNet() {
 }
 
 function createGround() {
-    // Main ground - rich jungle floor
-    const groundGeometry = new THREE.PlaneGeometry(200, 200, 50, 50);
-    
-    // Add some height variation
-    const vertices = groundGeometry.attributes.position.array;
-    for (let i = 0; i < vertices.length; i += 3) {
-        vertices[i + 2] = Math.sin(vertices[i] * 0.1) * Math.cos(vertices[i + 1] * 0.1) * 0.5;
-    }
-    groundGeometry.computeVertexNormals();
-    
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
+    // Create a spherical planet
+    const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 64, 64);
+    const planetMaterial = new THREE.MeshStandardMaterial({ 
         color: 0x2e8b57, // Darker jungle green
         roughness: 0.9
     });
     
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+    planet.receiveShadow = true;
+    scene.add(planet);
     
-    // Add jungle plants and ferns
-    for (let i = 0; i < 600; i++) {
+    // Add jungle plants and ferns on the sphere surface
+    for (let i = 0; i < 800; i++) {
         const plantType = Math.random();
         let plant;
         
@@ -279,17 +280,78 @@ function createGround() {
             plant = new THREE.Mesh(flowerGeometry, flowerMaterial);
         }
         
-        plant.position.set(
-            (Math.random() - 0.5) * 180,
-            0.15,
-            (Math.random() - 0.5) * 180
-        );
+        // Random position on sphere using spherical coordinates
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1); // Uniform distribution on sphere
+        const pos = sphericalToCartesian(theta, phi, PLANET_RADIUS + 0.2);
+        plant.position.copy(pos);
+        
+        // Orient plant to point outward from planet center
+        plant.lookAt(0, 0, 0);
+        plant.rotateX(Math.PI / 2);
+        
         plant.castShadow = true;
         scene.add(plant);
     }
 }
 
-function createPalmTree(x, z) {
+// Convert spherical coordinates to cartesian (x, y, z)
+function sphericalToCartesian(theta, phi, radius) {
+    return new THREE.Vector3(
+        radius * Math.sin(phi) * Math.cos(theta),
+        radius * Math.cos(phi),
+        radius * Math.sin(phi) * Math.sin(theta)
+    );
+}
+
+// Get position on planet surface
+function getPositionOnPlanet(theta, phi, height) {
+    return sphericalToCartesian(theta, phi, PLANET_RADIUS + height);
+}
+
+function createJungle() {
+    // Create palm trees and jungle trees distributed on sphere
+    for (let i = 0; i < 120; i++) {
+        // Random spherical coordinates - uniform distribution on sphere
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        
+        // Don't place trees too close to player's starting position (equator, theta=0)
+        const dTheta = Math.abs(theta);
+        const dPhi = Math.abs(phi - Math.PI / 2);
+        if (dTheta > 0.2 || dPhi > 0.2) {
+            if (Math.random() > 0.5) {
+                createPalmTreeOnSphere(theta, phi);
+            } else {
+                createJungleTreeOnSphere(theta, phi);
+            }
+        }
+    }
+    
+    // Add some standalone vines hanging from nothing (atmosphere)
+    for (let i = 0; i < 30; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        
+        const vineMaterial = new THREE.MeshStandardMaterial({ color: 0x2e8b57 });
+        const vineLength = 4 + Math.random() * 6;
+        const vineGeometry = new THREE.CylinderGeometry(0.04, 0.02, vineLength, 4);
+        const vine = new THREE.Mesh(vineGeometry, vineMaterial);
+        
+        // Position vine on sphere and orient outward
+        const pos = getPositionOnPlanet(theta, phi, 8);
+        vine.position.copy(pos);
+        
+        // Orient vine to point outward (hanging down from surface)
+        vine.lookAt(0, 0, 0);
+        vine.rotateX(Math.PI / 2);
+        
+        scene.add(vine);
+    }
+}
+
+// Create palm tree positioned on sphere surface
+function createPalmTreeOnSphere(theta, phi) {
     const tree = new THREE.Group();
     
     // Curved trunk (palm tree style)
@@ -335,17 +397,24 @@ function createPalmTree(x, z) {
         tree.add(coconut);
     }
     
-    tree.position.set(x, 0, z);
+    // Position on sphere and orient to point outward
+    const pos = getPositionOnPlanet(theta, phi, 0);
+    tree.position.copy(pos);
+    
+    // Orient tree to point away from planet center
+    tree.lookAt(0, 0, 0);
+    tree.rotateX(Math.PI); // Flip so tree points outward
     
     // Random scale variation
     const scale = 0.8 + Math.random() * 0.4;
     tree.scale.set(scale, scale, scale);
     
     scene.add(tree);
-    trees.push({ mesh: tree, x: x, z: z, radius: 1 });
+    trees.push({ mesh: tree, theta: theta, phi: phi, radius: 1 });
 }
 
-function createJungleTree(x, z) {
+// Create jungle tree positioned on sphere surface
+function createJungleTreeOnSphere(theta, phi) {
     const tree = new THREE.Group();
     
     // Thick trunk
@@ -387,47 +456,19 @@ function createJungleTree(x, z) {
         tree.add(vine);
     }
     
-    tree.position.set(x, 0, z);
+    // Position on sphere and orient to point outward
+    const pos = getPositionOnPlanet(theta, phi, 0);
+    tree.position.copy(pos);
+    
+    // Orient tree to point away from planet center
+    tree.lookAt(0, 0, 0);
+    tree.rotateX(Math.PI); // Flip so tree points outward
     
     const scale = 0.7 + Math.random() * 0.5;
     tree.scale.set(scale, scale, scale);
     
     scene.add(tree);
-    trees.push({ mesh: tree, x: x, z: z, radius: 1.5 });
-}
-
-function createJungle() {
-    // Create palm trees and jungle trees
-    for (let i = 0; i < 120; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 10 + Math.random() * 80;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-        
-        // Don't place trees too close to center
-        if (Math.sqrt(x*x + z*z) > 8) {
-            if (Math.random() > 0.5) {
-                createPalmTree(x, z);
-            } else {
-                createJungleTree(x, z);
-            }
-        }
-    }
-    
-    // Add some standalone vines hanging from nothing (atmosphere)
-    for (let i = 0; i < 30; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 15 + Math.random() * 60;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-        
-        const vineMaterial = new THREE.MeshStandardMaterial({ color: 0x2e8b57 });
-        const vineLength = 4 + Math.random() * 6;
-        const vineGeometry = new THREE.CylinderGeometry(0.04, 0.02, vineLength, 4);
-        const vine = new THREE.Mesh(vineGeometry, vineMaterial);
-        vine.position.set(x, 8 - vineLength / 2, z);
-        scene.add(vine);
-    }
+    trees.push({ mesh: tree, theta: theta, phi: phi, radius: 1 });
 }
 
 function createAnimal(type, x, z) {
@@ -1692,28 +1733,78 @@ function addLegs(animal, mat, radius, height, xSpread, zSpread) {
 function createAnimals() {
     animals = [];
     
-    // Create 10 random animals
+    // Create 10 random animals distributed on the sphere
     for (let i = 0; i < 10; i++) {
         const type = ANIMALS[i % ANIMALS.length];
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 15 + Math.random() * 50;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
+        // Random spherical position (avoid player starting area)
+        let theta, phi;
+        do {
+            theta = Math.random() * Math.PI * 2;
+            phi = Math.acos(2 * Math.random() - 1);
+        } while (angularDistance(theta, phi, playerTheta, playerPhi) < 0.3);
         
-        animals.push(createAnimal(type, x, z));
+        animals.push(createAnimalOnSphere(type, theta, phi));
+    }
+}
+
+// Create animal positioned on sphere
+function createAnimalOnSphere(type, theta, phi) {
+    const animal = createAnimal(type, 0, 0); // Create at origin first
+    
+    // Store spherical coordinates
+    animal.theta = theta;
+    animal.phi = phi;
+    animal.targetTheta = theta;
+    animal.targetPhi = phi;
+    
+    // Position on sphere
+    updateAnimalPositionOnSphere(animal);
+    
+    return animal;
+}
+
+// Update animal mesh position on sphere
+function updateAnimalPositionOnSphere(animal) {
+    const pos = getPositionOnPlanet(animal.theta, animal.phi, 0.15);
+    animal.mesh.position.copy(pos);
+    
+    // Orient animal to stand on sphere surface
+    animal.mesh.up = pos.clone().normalize();
+    
+    // Calculate forward direction for facing movement
+    const tangentTheta = new THREE.Vector3(
+        Math.sin(animal.phi) * (-Math.sin(animal.theta)),
+        0,
+        Math.sin(animal.phi) * Math.cos(animal.theta)
+    ).normalize();
+    
+    const tangentPhi = new THREE.Vector3(
+        Math.cos(animal.phi) * Math.cos(animal.theta),
+        -Math.sin(animal.phi),
+        Math.cos(animal.phi) * Math.sin(animal.theta)
+    ).normalize();
+    
+    // Face movement direction based on target
+    const dTheta = animal.targetTheta - animal.theta;
+    const dPhi = animal.targetPhi - animal.phi;
+    if (Math.abs(dTheta) > 0.001 || Math.abs(dPhi) > 0.001) {
+        const faceDir = tangentTheta.clone().multiplyScalar(dTheta)
+            .add(tangentPhi.clone().multiplyScalar(dPhi)).normalize();
+        const lookTarget = pos.clone().add(faceDir);
+        animal.mesh.lookAt(lookTarget);
     }
 }
 
 function createSky() {
-    // Sun
-    const sunGeometry = new THREE.SphereGeometry(5, 32, 32);
+    // Sun - positioned far from planet
+    const sunGeometry = new THREE.SphereGeometry(10, 32, 32);
     const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
     const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-    sun.position.set(50, 80, 50);
+    sun.position.set(200, 300, 200);
     scene.add(sun);
     
-    // Clouds
-    for (let i = 0; i < 20; i++) {
+    // Clouds - scattered around above the planet
+    for (let i = 0; i < 30; i++) {
         const cloudGroup = new THREE.Group();
         
         for (let j = 0; j < 5; j++) {
@@ -1732,11 +1823,16 @@ function createSky() {
             cloudGroup.add(cloudPart);
         }
         
-        cloudGroup.position.set(
-            (Math.random() - 0.5) * 200,
-            40 + Math.random() * 20,
-            (Math.random() - 0.5) * 200
-        );
+        // Position clouds around the planet at various heights
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const cloudRadius = PLANET_RADIUS + 15 + Math.random() * 20;
+        const cloudPos = sphericalToCartesian(theta, phi, cloudRadius);
+        cloudGroup.position.copy(cloudPos);
+        
+        // Orient clouds outward
+        cloudGroup.lookAt(0, 0, 0);
+        
         scene.add(cloudGroup);
     }
 }
@@ -1766,58 +1862,103 @@ function startGame() {
 function updatePlayer() {
     if (!gameRunning) return;
     
-    const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.2 : 0.1;
+    const baseSpeed = keys['ShiftLeft'] || keys['ShiftRight'] ? 0.008 : 0.004;
     
-    // Get movement direction based on camera yaw
-    let moveX = 0, moveZ = 0;
+    // Movement on sphere - change theta (longitude) and phi (latitude)
+    let dTheta = 0, dPhi = 0;
     
+    // Forward/backward moves along the look direction (yaw affects theta vs phi blend)
     if (keys['KeyW'] || keys['ArrowUp']) {
-        moveX -= Math.sin(yaw) * speed;
-        moveZ -= Math.cos(yaw) * speed;
+        dTheta -= Math.sin(yaw) * baseSpeed;
+        dPhi -= Math.cos(yaw) * baseSpeed;
     }
     if (keys['KeyS'] || keys['ArrowDown']) {
-        moveX += Math.sin(yaw) * speed;
-        moveZ += Math.cos(yaw) * speed;
+        dTheta += Math.sin(yaw) * baseSpeed;
+        dPhi += Math.cos(yaw) * baseSpeed;
     }
+    // Strafe moves perpendicular to look direction
     if (keys['KeyA'] || keys['ArrowLeft']) {
-        moveX -= Math.cos(yaw) * speed;
-        moveZ += Math.sin(yaw) * speed;
+        dTheta -= Math.cos(yaw) * baseSpeed;
+        dPhi += Math.sin(yaw) * baseSpeed;
     }
     if (keys['KeyD'] || keys['ArrowRight']) {
-        moveX += Math.cos(yaw) * speed;
-        moveZ -= Math.sin(yaw) * speed;
+        dTheta += Math.cos(yaw) * baseSpeed;
+        dPhi -= Math.sin(yaw) * baseSpeed;
     }
     
-    // Apply movement with collision check
-    const newX = player.x + moveX;
-    const newZ = player.z + moveZ;
+    // Apply movement (theta wraps around, phi is clamped to avoid poles)
+    const newTheta = playerTheta + dTheta;
+    const newPhi = Math.max(0.1, Math.min(Math.PI - 0.1, playerPhi + dPhi));
     
-    // Check tree collisions
+    // Check tree collisions using angular distance
     let canMove = true;
     trees.forEach(tree => {
-        const dx = newX - tree.x;
-        const dz = newZ - tree.z;
-        const dist = Math.sqrt(dx*dx + dz*dz);
-        if (dist < tree.radius + 0.5) {
+        const angDist = angularDistance(newTheta, newPhi, tree.theta, tree.phi);
+        if (angDist < 0.05) { // Collision radius in radians
             canMove = false;
         }
     });
     
-    // Keep player in bounds
-    if (Math.abs(newX) > 95 || Math.abs(newZ) > 95) {
-        canMove = false;
-    }
-    
     if (canMove) {
-        player.x = newX;
-        player.z = newZ;
+        playerTheta = newTheta;
+        playerPhi = newPhi;
+        
+        // Keep theta in [0, 2*PI] range
+        while (playerTheta < 0) playerTheta += Math.PI * 2;
+        while (playerTheta >= Math.PI * 2) playerTheta -= Math.PI * 2;
     }
     
-    // Update camera
-    camera.position.set(player.x, player.y, player.z);
-    camera.rotation.order = 'YXZ';
-    camera.rotation.y = yaw;
-    camera.rotation.x = pitch;
+    // Update camera position on sphere
+    const playerPos = getPositionOnPlanet(playerTheta, playerPhi, 1.6);
+    camera.position.copy(playerPos);
+    
+    // Camera orientation: up vector points away from planet center
+    const upVector = playerPos.clone().normalize();
+    
+    // Calculate forward direction (tangent to sphere)
+    // We need to compute the local forward based on yaw
+    const tangentTheta = new THREE.Vector3(
+        Math.sin(playerPhi) * (-Math.sin(playerTheta)),
+        0,
+        Math.sin(playerPhi) * Math.cos(playerTheta)
+    ).normalize();
+    
+    const tangentPhi = new THREE.Vector3(
+        Math.cos(playerPhi) * Math.cos(playerTheta),
+        -Math.sin(playerPhi),
+        Math.cos(playerPhi) * Math.sin(playerTheta)
+    ).normalize();
+    
+    // Combine tangents based on yaw to get look direction
+    const forward = tangentTheta.clone().multiplyScalar(Math.sin(yaw))
+        .add(tangentPhi.clone().multiplyScalar(Math.cos(yaw)));
+    
+    // Apply pitch
+    const lookDir = forward.clone()
+        .add(upVector.clone().multiplyScalar(Math.sin(pitch)));
+    
+    const lookTarget = playerPos.clone().add(lookDir);
+    camera.up.copy(upVector);
+    camera.lookAt(lookTarget);
+    
+    // Store player position for animal collision detection
+    player.theta = playerTheta;
+    player.phi = playerPhi;
+}
+
+// Calculate angular distance between two points on sphere
+function angularDistance(theta1, phi1, theta2, phi2) {
+    // Great circle distance
+    const sinPhi1 = Math.sin(phi1);
+    const cosPhi1 = Math.cos(phi1);
+    const sinPhi2 = Math.sin(phi2);
+    const cosPhi2 = Math.cos(phi2);
+    const dTheta = theta2 - theta1;
+    
+    return Math.acos(
+        cosPhi1 * cosPhi2 + 
+        sinPhi1 * sinPhi2 * Math.cos(dTheta)
+    );
 }
 
 function updateAnimals() {
@@ -1826,62 +1967,93 @@ function updateAnimals() {
     animals.forEach(animal => {
         if (animal.caught) return;
         
-        // Check if player is nearby
-        const dx = player.x - animal.x;
-        const dz = player.z - animal.z;
-        const distToPlayer = Math.sqrt(dx*dx + dz*dz);
+        // Check if player is nearby using angular distance
+        const distToPlayer = angularDistance(animal.theta, animal.phi, playerTheta, playerPhi);
         
-        // Run away if player is close (removed auto-catch - must use net!)
-        if (distToPlayer < 15) {
-            // Move away from player
-            const angle = Math.atan2(animal.z - player.z, animal.x - player.x);
-            animal.targetX = animal.x + Math.cos(angle) * 20;
-            animal.targetZ = animal.z + Math.sin(angle) * 20;
+        // Run away if player is close (angular distance < 0.3 radians ~= 15 units on r=50 sphere)
+        if (distToPlayer < 0.3) {
+            // Move away from player - increase angle difference
+            const dTheta = animal.theta - playerTheta;
+            const dPhi = animal.phi - playerPhi;
+            const len = Math.sqrt(dTheta * dTheta + dPhi * dPhi);
+            if (len > 0.01) {
+                animal.targetTheta = animal.theta + (dTheta / len) * 0.5;
+                animal.targetPhi = animal.phi + (dPhi / len) * 0.5;
+            }
         } else {
             // Wander randomly
             animal.moveTimer--;
             if (animal.moveTimer <= 0) {
-                animal.targetX = animal.x + (Math.random() - 0.5) * 20;
-                animal.targetZ = animal.z + (Math.random() - 0.5) * 20;
+                animal.targetTheta = animal.theta + (Math.random() - 0.5) * 0.5;
+                animal.targetPhi = animal.phi + (Math.random() - 0.5) * 0.3;
                 animal.moveTimer = 60 + Math.random() * 120;
             }
         }
         
-        // Keep animals in bounds
-        animal.targetX = Math.max(-90, Math.min(90, animal.targetX));
-        animal.targetZ = Math.max(-90, Math.min(90, animal.targetZ));
+        // Keep phi in valid range (avoid poles)
+        animal.targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, animal.targetPhi));
         
         // Move towards target
-        const toTargetX = animal.targetX - animal.x;
-        const toTargetZ = animal.targetZ - animal.z;
-        const distToTarget = Math.sqrt(toTargetX*toTargetX + toTargetZ*toTargetZ);
+        const toTargetTheta = animal.targetTheta - animal.theta;
+        const toTargetPhi = animal.targetPhi - animal.phi;
+        const distToTarget = Math.sqrt(toTargetTheta * toTargetTheta + toTargetPhi * toTargetPhi);
         
-        const isMoving = distToTarget > 0.5;
+        const isMoving = distToTarget > 0.01;
         
         if (isMoving) {
-            const speed = distToPlayer < 15 ? animal.type.speed * 1.5 : animal.type.speed;
-            animal.x += (toTargetX / distToTarget) * speed;
-            animal.z += (toTargetZ / distToTarget) * speed;
+            const speed = distToPlayer < 0.3 ? animal.type.speed * 0.03 : animal.type.speed * 0.015;
+            animal.theta += (toTargetTheta / distToTarget) * speed;
+            animal.phi += (toTargetPhi / distToTarget) * speed;
+            
+            // Keep theta in valid range
+            while (animal.theta < 0) animal.theta += Math.PI * 2;
+            while (animal.theta >= Math.PI * 2) animal.theta -= Math.PI * 2;
             
             // Check tree collisions
             trees.forEach(tree => {
-                const tdx = animal.x - tree.x;
-                const tdz = animal.z - tree.z;
-                const tdist = Math.sqrt(tdx*tdx + tdz*tdz);
-                if (tdist < tree.radius + 0.5) {
-                    animal.x = tree.x + (tdx / tdist) * (tree.radius + 0.6);
-                    animal.z = tree.z + (tdz / tdist) * (tree.radius + 0.6);
-                    animal.targetX = animal.x + (Math.random() - 0.5) * 10;
-                    animal.targetZ = animal.z + (Math.random() - 0.5) * 10;
+                const treeDist = angularDistance(animal.theta, animal.phi, tree.theta, tree.phi);
+                if (treeDist < 0.05) {
+                    // Push away from tree
+                    const dTheta = animal.theta - tree.theta;
+                    const dPhi = animal.phi - tree.phi;
+                    const len = Math.sqrt(dTheta * dTheta + dPhi * dPhi);
+                    if (len > 0.001) {
+                        animal.theta = tree.theta + (dTheta / len) * 0.06;
+                        animal.phi = tree.phi + (dPhi / len) * 0.06;
+                    }
+                    animal.targetTheta = animal.theta + (Math.random() - 0.5) * 0.2;
+                    animal.targetPhi = animal.phi + (Math.random() - 0.5) * 0.2;
                 }
             });
-            
-            // Face movement direction
-            animal.mesh.rotation.y = Math.atan2(toTargetX, toTargetZ);
         }
         
-        // Animate bobbing (keep snakes above ground - base height 0.1 + small bob)
-        animal.mesh.position.set(animal.x, 0.15 + Math.sin(time * 0.005) * 0.05, animal.z);
+        // Update position on sphere with small bobbing animation
+        const bobHeight = 0.15 + Math.sin(time * 0.005) * 0.05;
+        const pos = getPositionOnPlanet(animal.theta, animal.phi, bobHeight);
+        animal.mesh.position.copy(pos);
+        
+        // Orient animal to stand on sphere surface
+        animal.mesh.up = pos.clone().normalize();
+        
+        // Face movement direction using quaternion-based orientation
+        if (isMoving && distToTarget > 0.01) {
+            const tangentTheta = new THREE.Vector3(
+                Math.sin(animal.phi) * (-Math.sin(animal.theta)),
+                0,
+                Math.sin(animal.phi) * Math.cos(animal.theta)
+            ).normalize();
+            
+            const tangentPhi = new THREE.Vector3(
+                Math.cos(animal.phi) * Math.cos(animal.theta),
+                -Math.sin(animal.phi),
+                Math.cos(animal.phi) * Math.sin(animal.theta)
+            ).normalize();
+            
+            const faceDir = tangentTheta.clone().multiplyScalar(toTargetTheta)
+                .add(tangentPhi.clone().multiplyScalar(toTargetPhi)).normalize();
+            const lookTarget = pos.clone().add(faceDir);
+            animal.mesh.lookAt(lookTarget);
+        }
         
         // Animate legs if animal has them
         if (animal.legs && isMoving) {

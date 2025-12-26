@@ -1961,10 +1961,13 @@ function angularDistance(theta1, phi1, theta2, phi2) {
     const cosPhi2 = Math.cos(phi2);
     const dTheta = theta2 - theta1;
     
-    return Math.acos(
+    // Clamp to [-1, 1] to avoid NaN from floating point errors
+    const cosAngle = Math.max(-1, Math.min(1,
         cosPhi1 * cosPhi2 + 
         sinPhi1 * sinPhi2 * Math.cos(dTheta)
-    );
+    ));
+    
+    return Math.acos(cosAngle);
 }
 
 function updateAnimals() {

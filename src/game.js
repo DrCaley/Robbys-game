@@ -1868,25 +1868,24 @@ function updatePlayer() {
     // Movement on sphere - change theta (longitude) and phi (latitude)
     let dTheta = 0, dPhi = 0;
     
-    // Camera forward direction uses: -sin(yaw) for theta, -cos(yaw) for phi
-    // Movement must match this direction
+    // Forward = direction camera is looking
     if (keys['KeyW'] || keys['ArrowUp']) {
-        dTheta -= Math.sin(yaw) * baseSpeed;
-        dPhi -= Math.cos(yaw) * baseSpeed;
-    }
-    if (keys['KeyS'] || keys['ArrowDown']) {
         dTheta += Math.sin(yaw) * baseSpeed;
         dPhi += Math.cos(yaw) * baseSpeed;
     }
-    // Strafe left = 90 degrees CCW from forward
-    if (keys['KeyA'] || keys['ArrowLeft']) {
-        dTheta -= Math.cos(yaw) * baseSpeed;
-        dPhi += Math.sin(yaw) * baseSpeed;
+    if (keys['KeyS'] || keys['ArrowDown']) {
+        dTheta -= Math.sin(yaw) * baseSpeed;
+        dPhi -= Math.cos(yaw) * baseSpeed;
     }
-    // Strafe right = 90 degrees CW from forward
-    if (keys['KeyD'] || keys['ArrowRight']) {
+    // Strafe left
+    if (keys['KeyA'] || keys['ArrowLeft']) {
         dTheta += Math.cos(yaw) * baseSpeed;
         dPhi -= Math.sin(yaw) * baseSpeed;
+    }
+    // Strafe right
+    if (keys['KeyD'] || keys['ArrowRight']) {
+        dTheta -= Math.cos(yaw) * baseSpeed;
+        dPhi += Math.sin(yaw) * baseSpeed;
     }
     
     // Apply movement (theta wraps around, phi is clamped to avoid poles)

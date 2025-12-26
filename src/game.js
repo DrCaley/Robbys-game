@@ -1,18 +1,24 @@
-// ===== ROBBY'S JUNGLE ADVENTURE - 3D SNAKE CATCHING GAME =====
-// Made by Robby! 🐍🌴
+// ===== ROBBY'S JUNGLE ADVENTURE - 3D ANIMAL CATCHING GAME =====
+// Made by Robby! 🐍🌴🦊
 
-// ===== SNAKE TYPES =====
+// ===== JUNGLE ANIMALS =====
 const ANIMALS = [
-    { name: 'Python', emoji: '🐍', color: 0x8b7355, speed: 0.05 },
-    { name: 'Cobra', emoji: '🐍', color: 0x2d2d2d, speed: 0.08 },
-    { name: 'Viper', emoji: '🐍', color: 0x228b22, speed: 0.1 },
-    { name: 'Anaconda', emoji: '🐍', color: 0x556b2f, speed: 0.04 },
-    { name: 'Coral Snake', emoji: '🐍', color: 0xff4500, speed: 0.12 },
-    { name: 'Rattlesnake', emoji: '🐍', color: 0xd2b48c, speed: 0.07 },
-    { name: 'Boa', emoji: '🐍', color: 0xcd853f, speed: 0.05 },
-    { name: 'Mamba', emoji: '🐍', color: 0x32cd32, speed: 0.15 },
-    { name: 'King Snake', emoji: '🐍', color: 0x1a1a1a, speed: 0.09 },
-    { name: 'Tree Snake', emoji: '🐍', color: 0x90ee90, speed: 0.11 }
+    // Snakes
+    { name: 'Python', emoji: '🐍', color: 0x8b7355, speed: 0.05, type: 'snake' },
+    { name: 'Cobra', emoji: '🐍', color: 0x2d2d2d, speed: 0.08, type: 'snake' },
+    { name: 'Viper', emoji: '🐍', color: 0x228b22, speed: 0.1, type: 'snake' },
+    // Mammals
+    { name: 'Fox', emoji: '🦊', color: 0xff6b35, speed: 0.09, type: 'mammal' },
+    { name: 'Wolf', emoji: '🐺', color: 0x708090, speed: 0.1, type: 'mammal' },
+    { name: 'Bear', emoji: '🐻', color: 0x654321, speed: 0.06, type: 'mammal' },
+    { name: 'Squirrel', emoji: '🐿️', color: 0xd2691e, speed: 0.15, type: 'mammal' },
+    { name: 'Jaguar', emoji: '🐆', color: 0xdaa520, speed: 0.12, type: 'mammal' },
+    { name: 'Monkey', emoji: '🐒', color: 0x8b4513, speed: 0.14, type: 'mammal' },
+    { name: 'Parrot', emoji: '🦜', color: 0xff1493, speed: 0.08, type: 'bird' },
+    { name: 'Toucan', emoji: '🦅', color: 0x000000, speed: 0.07, type: 'bird' },
+    { name: 'Frog', emoji: '🐸', color: 0x32cd32, speed: 0.11, type: 'amphibian' },
+    { name: 'Gorilla', emoji: '🦍', color: 0x2f2f2f, speed: 0.05, type: 'mammal' },
+    { name: 'Tiger', emoji: '🐅', color: 0xff8c00, speed: 0.11, type: 'mammal' },
 ];
 
 // ===== GAME STATE =====
@@ -430,9 +436,11 @@ function createAnimal(type, x, z) {
     const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
     const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
     const accentMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const noseMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 });
     
-    // Different snake body shapes based on type
+    // Different animal shapes based on type
     switch(type.name) {
+        // Snakes
         case 'Python':
             createPython(animal, bodyMaterial, darkMaterial);
             break;
@@ -442,29 +450,42 @@ function createAnimal(type, x, z) {
         case 'Viper':
             createViper(animal, bodyMaterial, darkMaterial);
             break;
-        case 'Anaconda':
-            createAnaconda(animal, bodyMaterial, darkMaterial);
+        // Mammals
+        case 'Fox':
+            createFox(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
             break;
-        case 'Coral Snake':
-            createCoralSnake(animal, accentMaterial, darkMaterial, whiteMaterial);
+        case 'Wolf':
+            createWolf(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
             break;
-        case 'Rattlesnake':
-            createRattlesnake(animal, bodyMaterial, darkMaterial);
+        case 'Bear':
+            createBear(animal, bodyMaterial, darkMaterial, noseMaterial);
             break;
-        case 'Boa':
-            createBoa(animal, bodyMaterial, darkMaterial);
+        case 'Squirrel':
+            createSquirrel(animal, bodyMaterial, whiteMaterial, darkMaterial, noseMaterial);
             break;
-        case 'Mamba':
-            createMamba(animal, bodyMaterial, darkMaterial);
+        case 'Jaguar':
+            createJaguar(animal, bodyMaterial, darkMaterial, noseMaterial);
             break;
-        case 'King Snake':
-            createKingSnake(animal, bodyMaterial, whiteMaterial, darkMaterial);
+        case 'Monkey':
+            createMonkey(animal, bodyMaterial, darkMaterial);
             break;
-        case 'Tree Snake':
-            createTreeSnake(animal, bodyMaterial, darkMaterial);
+        case 'Parrot':
+            createParrot(animal, bodyMaterial, darkMaterial);
+            break;
+        case 'Toucan':
+            createToucan(animal, bodyMaterial, darkMaterial);
+            break;
+        case 'Frog':
+            createFrog(animal, bodyMaterial, darkMaterial);
+            break;
+        case 'Gorilla':
+            createGorilla(animal, bodyMaterial, darkMaterial);
+            break;
+        case 'Tiger':
+            createTiger(animal, bodyMaterial, darkMaterial, whiteMaterial);
             break;
         default:
-            createGenericSnake(animal, bodyMaterial, darkMaterial);
+            createGenericAnimal(animal, bodyMaterial, darkMaterial);
     }
     
     animal.position.set(x, 0, z);
@@ -995,6 +1016,633 @@ function createGenericSnake(animal, bodyMat, darkMat) {
     const rightEye = new THREE.Mesh(eyeGeo, darkMat);
     rightEye.position.set(0.05, 0.12, 0.2);
     animal.add(rightEye);
+}
+
+// ===== JUNGLE MAMMAL MODELS =====
+
+function createFox(animal, bodyMat, whiteMat, darkMat, noseMat) {
+    // Sleek body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), bodyMat);
+    body.scale.set(1, 0.7, 1.4);
+    body.position.set(0, 0.4, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Chest (white)
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), whiteMat);
+    chest.position.set(0, 0.35, 0.35);
+    animal.add(chest);
+    
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), bodyMat);
+    head.scale.set(1, 0.9, 1.1);
+    head.position.set(0, 0.55, 0.5);
+    animal.add(head);
+    
+    // Snout
+    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 8), bodyMat);
+    snout.rotation.x = -Math.PI / 2;
+    snout.position.set(0, 0.5, 0.75);
+    animal.add(snout);
+    
+    // Nose
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), noseMat);
+    nose.position.set(0, 0.5, 0.9);
+    animal.add(nose);
+    
+    // Big triangular ears
+    const earGeo = new THREE.ConeGeometry(0.12, 0.25, 4);
+    const leftEar = new THREE.Mesh(earGeo, bodyMat);
+    leftEar.position.set(-0.12, 0.8, 0.4);
+    animal.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, bodyMat);
+    rightEar.position.set(0.12, 0.8, 0.4);
+    animal.add(rightEar);
+    
+    // Eyes
+    addEyes(animal, darkMat, 0.04, 0.58, 0.65, 0.08);
+    
+    // Legs
+    addLegs(animal, bodyMat, 0.05, 0.35, 0.2, 0.25);
+    
+    // Fluffy tail
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), bodyMat);
+    tail.scale.set(0.6, 0.6, 1.2);
+    tail.position.set(0, 0.4, -0.55);
+    animal.add(tail);
+    const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), whiteMat);
+    tailTip.position.set(0, 0.35, -0.8);
+    animal.add(tailTip);
+}
+
+function createWolf(animal, bodyMat, whiteMat, darkMat, noseMat) {
+    // Lean body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), bodyMat);
+    body.scale.set(0.9, 0.75, 1.4);
+    body.position.set(0, 0.5, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Chest
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), whiteMat);
+    chest.position.set(0, 0.4, 0.35);
+    animal.add(chest);
+    
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), bodyMat);
+    head.scale.set(1, 0.9, 1.2);
+    head.position.set(0, 0.65, 0.5);
+    animal.add(head);
+    
+    // Long snout
+    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.3, 8), bodyMat);
+    snout.rotation.x = -Math.PI / 2;
+    snout.position.set(0, 0.6, 0.75);
+    animal.add(snout);
+    
+    // Nose
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), noseMat);
+    nose.position.set(0, 0.6, 0.9);
+    animal.add(nose);
+    
+    // Pointy ears
+    const earGeo = new THREE.ConeGeometry(0.08, 0.2, 4);
+    const leftEar = new THREE.Mesh(earGeo, bodyMat);
+    leftEar.position.set(-0.12, 0.88, 0.4);
+    animal.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, bodyMat);
+    rightEar.position.set(0.12, 0.88, 0.4);
+    animal.add(rightEar);
+    
+    // Yellow eyes
+    const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
+    addEyes(animal, yellowMat, 0.04, 0.68, 0.65, 0.08);
+    
+    // Legs
+    addLegs(animal, bodyMat, 0.06, 0.4, 0.22, 0.3);
+    
+    // Bushy tail
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), bodyMat);
+    tail.scale.set(0.5, 0.5, 1.2);
+    tail.position.set(0, 0.45, -0.55);
+    animal.add(tail);
+}
+
+function createBear(animal, bodyMat, darkMat, noseMat) {
+    // Big round body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), bodyMat);
+    body.scale.set(1, 0.85, 1.1);
+    body.position.set(0, 0.55, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Big round head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), bodyMat);
+    head.position.set(0, 0.85, 0.45);
+    animal.add(head);
+    
+    // Muzzle
+    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), bodyMat);
+    muzzle.scale.set(1, 0.8, 1);
+    muzzle.position.set(0, 0.78, 0.75);
+    animal.add(muzzle);
+    
+    // Nose
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), noseMat);
+    nose.position.set(0, 0.8, 0.92);
+    animal.add(nose);
+    
+    // Small round ears
+    const earGeo = new THREE.SphereGeometry(0.1, 12, 12);
+    const leftEar = new THREE.Mesh(earGeo, bodyMat);
+    leftEar.position.set(-0.25, 1.1, 0.35);
+    animal.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, bodyMat);
+    rightEar.position.set(0.25, 1.1, 0.35);
+    animal.add(rightEar);
+    
+    // Eyes
+    addEyes(animal, darkMat, 0.04, 0.9, 0.7, 0.12);
+    
+    // Chunky legs
+    addLegs(animal, bodyMat, 0.12, 0.4, 0.3, 0.35);
+}
+
+function createSquirrel(animal, bodyMat, whiteMat, darkMat, noseMat) {
+    // Small round body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), bodyMat);
+    body.scale.set(1, 0.9, 1.1);
+    body.position.set(0, 0.25, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Round head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), bodyMat);
+    head.position.set(0, 0.4, 0.15);
+    animal.add(head);
+    
+    // Tiny snout
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), bodyMat);
+    snout.position.set(0, 0.38, 0.28);
+    animal.add(snout);
+    
+    // Nose
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), noseMat);
+    nose.position.set(0, 0.38, 0.34);
+    animal.add(nose);
+    
+    // Round ears
+    const earGeo = new THREE.SphereGeometry(0.05, 10, 10);
+    const leftEar = new THREE.Mesh(earGeo, bodyMat);
+    leftEar.position.set(-0.1, 0.52, 0.1);
+    animal.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, bodyMat);
+    rightEar.position.set(0.1, 0.52, 0.1);
+    animal.add(rightEar);
+    
+    // Big eyes
+    addEyes(animal, darkMat, 0.035, 0.43, 0.25, 0.06);
+    
+    // Tiny legs
+    addLegs(animal, bodyMat, 0.03, 0.15, 0.1, 0.1);
+    
+    // HUGE fluffy tail
+    const tailBase = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), bodyMat);
+    tailBase.scale.set(0.7, 1, 1);
+    tailBase.position.set(0, 0.35, -0.2);
+    animal.add(tailBase);
+    const tailMid = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), bodyMat);
+    tailMid.scale.set(0.6, 1.2, 0.8);
+    tailMid.position.set(0, 0.55, -0.25);
+    animal.add(tailMid);
+    const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), bodyMat);
+    tailTip.position.set(0, 0.75, -0.2);
+    animal.add(tailTip);
+}
+
+function createJaguar(animal, bodyMat, darkMat, noseMat) {
+    // Sleek powerful body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), bodyMat);
+    body.scale.set(0.9, 0.7, 1.5);
+    body.position.set(0, 0.5, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), bodyMat);
+    head.scale.set(1.1, 0.9, 1);
+    head.position.set(0, 0.6, 0.55);
+    animal.add(head);
+    
+    // Snout
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), bodyMat);
+    snout.scale.set(1, 0.7, 1);
+    snout.position.set(0, 0.55, 0.75);
+    animal.add(snout);
+    
+    // Nose
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), noseMat);
+    nose.position.set(0, 0.55, 0.87);
+    animal.add(nose);
+    
+    // Round ears
+    const earGeo = new THREE.SphereGeometry(0.08, 10, 10);
+    const leftEar = new THREE.Mesh(earGeo, bodyMat);
+    leftEar.position.set(-0.18, 0.82, 0.45);
+    animal.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, bodyMat);
+    rightEar.position.set(0.18, 0.82, 0.45);
+    animal.add(rightEar);
+    
+    // Spots
+    const spotMat = new THREE.MeshStandardMaterial({ color: 0x3d2817 });
+    for (let i = 0; i < 15; i++) {
+        const spot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), spotMat);
+        spot.position.set(
+            (Math.random() - 0.5) * 0.6,
+            0.4 + Math.random() * 0.3,
+            (Math.random() - 0.5) * 0.8
+        );
+        spot.scale.set(1, 0.3, 1);
+        animal.add(spot);
+    }
+    
+    // Eyes
+    const greenMat = new THREE.MeshStandardMaterial({ color: 0x90ee90 });
+    addEyes(animal, greenMat, 0.04, 0.63, 0.7, 0.1);
+    
+    // Strong legs
+    addLegs(animal, bodyMat, 0.07, 0.4, 0.25, 0.35);
+    
+    // Long tail
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.8, 8), bodyMat);
+    tail.rotation.x = Math.PI / 3;
+    tail.position.set(0, 0.4, -0.7);
+    animal.add(tail);
+}
+
+function createMonkey(animal, bodyMat, darkMat) {
+    // Body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), bodyMat);
+    body.scale.set(1, 1.1, 0.9);
+    body.position.set(0, 0.4, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), bodyMat);
+    head.position.set(0, 0.7, 0.15);
+    animal.add(head);
+    
+    // Face (lighter color)
+    const faceMat = new THREE.MeshStandardMaterial({ color: 0xdeb887 });
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), faceMat);
+    face.scale.set(1, 0.9, 0.5);
+    face.position.set(0, 0.68, 0.25);
+    animal.add(face);
+    
+    // Snout
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), faceMat);
+    snout.position.set(0, 0.62, 0.32);
+    animal.add(snout);
+    
+    // Big ears
+    const earGeo = new THREE.SphereGeometry(0.1, 10, 10);
+    const leftEar = new THREE.Mesh(earGeo, bodyMat);
+    leftEar.position.set(-0.22, 0.75, 0.1);
+    animal.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, bodyMat);
+    rightEar.position.set(0.22, 0.75, 0.1);
+    animal.add(rightEar);
+    
+    // Eyes
+    addEyes(animal, darkMat, 0.04, 0.72, 0.3, 0.08);
+    
+    // Arms
+    const armGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.4, 8);
+    const leftArm = new THREE.Mesh(armGeo, bodyMat);
+    leftArm.position.set(-0.25, 0.35, 0.1);
+    leftArm.rotation.z = 0.5;
+    animal.add(leftArm);
+    const rightArm = new THREE.Mesh(armGeo, bodyMat);
+    rightArm.position.set(0.25, 0.35, 0.1);
+    rightArm.rotation.z = -0.5;
+    animal.add(rightArm);
+    
+    // Legs
+    addLegs(animal, bodyMat, 0.05, 0.25, 0.12, 0.1);
+    
+    // Curly tail
+    const tail = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.03, 8, 16, Math.PI * 1.5), bodyMat);
+    tail.position.set(0, 0.3, -0.25);
+    tail.rotation.y = Math.PI / 2;
+    animal.add(tail);
+}
+
+function createParrot(animal, bodyMat, darkMat) {
+    // Body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), bodyMat);
+    body.scale.set(1, 1.2, 0.8);
+    body.position.set(0, 0.35, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), bodyMat);
+    head.position.set(0, 0.6, 0.1);
+    animal.add(head);
+    
+    // Beak
+    const beakMat = new THREE.MeshStandardMaterial({ color: 0xffa500 });
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.15, 8), beakMat);
+    beak.rotation.x = -Math.PI / 2 - 0.3;
+    beak.position.set(0, 0.55, 0.28);
+    animal.add(beak);
+    
+    // Eyes
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    addEyes(animal, whiteMat, 0.04, 0.63, 0.2, 0.1);
+    addEyes(animal, darkMat, 0.02, 0.63, 0.23, 0.1);
+    
+    // Colorful wings
+    const wingColors = [0x00ff00, 0x0000ff, 0xffff00];
+    const wingGeo = new THREE.SphereGeometry(0.15, 10, 10);
+    for (let i = 0; i < 2; i++) {
+        const side = i === 0 ? -1 : 1;
+        for (let j = 0; j < 3; j++) {
+            const wingMat = new THREE.MeshStandardMaterial({ color: wingColors[j] });
+            const wing = new THREE.Mesh(wingGeo, wingMat);
+            wing.scale.set(0.3, 0.8, 0.5);
+            wing.position.set(side * 0.2, 0.35 - j * 0.1, -0.05 - j * 0.05);
+            animal.add(wing);
+        }
+    }
+    
+    // Tail feathers
+    const tailMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    for (let i = 0; i < 3; i++) {
+        const feather = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.01, 0.4, 6), tailMat);
+        feather.position.set((i - 1) * 0.05, 0.15, -0.25);
+        feather.rotation.x = 0.5;
+        animal.add(feather);
+    }
+    
+    // Feet
+    const feetMat = new THREE.MeshStandardMaterial({ color: 0x666666 });
+    const leftFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
+    leftFoot.position.set(-0.08, 0.05, 0.05);
+    animal.add(leftFoot);
+    const rightFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
+    rightFoot.position.set(0.08, 0.05, 0.05);
+    animal.add(rightFoot);
+}
+
+function createToucan(animal, bodyMat, darkMat) {
+    // Body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), bodyMat);
+    body.scale.set(1, 1.1, 0.9);
+    body.position.set(0, 0.35, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // White chest
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), whiteMat);
+    chest.position.set(0, 0.32, 0.12);
+    animal.add(chest);
+    
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), bodyMat);
+    head.position.set(0, 0.55, 0.1);
+    animal.add(head);
+    
+    // HUGE colorful beak!
+    const beakMat = new THREE.MeshStandardMaterial({ color: 0xff8c00 });
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.35, 8), beakMat);
+    beak.rotation.x = -Math.PI / 2;
+    beak.position.set(0, 0.5, 0.35);
+    animal.add(beak);
+    
+    // Beak stripe
+    const greenMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.2), greenMat);
+    stripe.position.set(0, 0.48, 0.35);
+    animal.add(stripe);
+    
+    // Eyes
+    addEyes(animal, darkMat, 0.03, 0.58, 0.18, 0.08);
+    
+    // Wings
+    const wingGeo = new THREE.SphereGeometry(0.12, 10, 10);
+    const leftWing = new THREE.Mesh(wingGeo, bodyMat);
+    leftWing.scale.set(0.3, 0.8, 0.6);
+    leftWing.position.set(-0.2, 0.35, -0.05);
+    animal.add(leftWing);
+    const rightWing = new THREE.Mesh(wingGeo, bodyMat);
+    rightWing.scale.set(0.3, 0.8, 0.6);
+    rightWing.position.set(0.2, 0.35, -0.05);
+    animal.add(rightWing);
+    
+    // Tail
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.05), bodyMat);
+    tail.position.set(0, 0.2, -0.2);
+    tail.rotation.x = 0.3;
+    animal.add(tail);
+    
+    // Feet
+    const feetMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+    const leftFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
+    leftFoot.position.set(-0.08, 0.05, 0.05);
+    animal.add(leftFoot);
+    const rightFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), feetMat);
+    rightFoot.position.set(0.08, 0.05, 0.05);
+    animal.add(rightFoot);
+}
+
+function createFrog(animal, bodyMat, darkMat) {
+    // Body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), bodyMat);
+    body.scale.set(1.2, 0.7, 1);
+    body.position.set(0, 0.2, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Head (merged with body)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), bodyMat);
+    head.scale.set(1.1, 0.8, 1);
+    head.position.set(0, 0.25, 0.2);
+    animal.add(head);
+    
+    // BIG bulging eyes!
+    const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const leftEyeBulge = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), eyeWhiteMat);
+    leftEyeBulge.position.set(-0.12, 0.4, 0.2);
+    animal.add(leftEyeBulge);
+    const rightEyeBulge = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), eyeWhiteMat);
+    rightEyeBulge.position.set(0.12, 0.4, 0.2);
+    animal.add(rightEyeBulge);
+    
+    // Pupils
+    addEyes(animal, darkMat, 0.04, 0.42, 0.28, 0.12);
+    
+    // Wide mouth
+    const mouthMat = new THREE.MeshStandardMaterial({ color: 0x006400 });
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.02, 0.1), mouthMat);
+    mouth.position.set(0, 0.18, 0.32);
+    animal.add(mouth);
+    
+    // Back legs (bent)
+    const legMat = bodyMat;
+    const thighGeo = new THREE.SphereGeometry(0.1, 10, 10);
+    const leftThigh = new THREE.Mesh(thighGeo, legMat);
+    leftThigh.scale.set(0.8, 1.2, 1);
+    leftThigh.position.set(-0.22, 0.15, -0.1);
+    animal.add(leftThigh);
+    const rightThigh = new THREE.Mesh(thighGeo, legMat);
+    rightThigh.scale.set(0.8, 1.2, 1);
+    rightThigh.position.set(0.22, 0.15, -0.1);
+    animal.add(rightThigh);
+    
+    // Front legs
+    const frontLegGeo = new THREE.CylinderGeometry(0.03, 0.02, 0.15, 8);
+    const leftFront = new THREE.Mesh(frontLegGeo, legMat);
+    leftFront.position.set(-0.15, 0.08, 0.15);
+    leftFront.rotation.z = 0.3;
+    animal.add(leftFront);
+    const rightFront = new THREE.Mesh(frontLegGeo, legMat);
+    rightFront.position.set(0.15, 0.08, 0.15);
+    rightFront.rotation.z = -0.3;
+    animal.add(rightFront);
+}
+
+function createGorilla(animal, bodyMat, darkMat) {
+    // Massive body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), bodyMat);
+    body.scale.set(1.2, 1, 0.9);
+    body.position.set(0, 0.55, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // Big head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), bodyMat);
+    head.scale.set(1, 0.9, 1);
+    head.position.set(0, 0.95, 0.2);
+    animal.add(head);
+    
+    // Face
+    const faceMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), faceMat);
+    face.scale.set(1, 0.8, 0.5);
+    face.position.set(0, 0.9, 0.35);
+    animal.add(face);
+    
+    // Nose/mouth area
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), faceMat);
+    snout.position.set(0, 0.85, 0.42);
+    animal.add(snout);
+    
+    // Nostrils
+    const nostrilMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    const leftNostril = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), nostrilMat);
+    leftNostril.position.set(-0.04, 0.85, 0.53);
+    animal.add(leftNostril);
+    const rightNostril = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), nostrilMat);
+    rightNostril.position.set(0.04, 0.85, 0.53);
+    animal.add(rightNostril);
+    
+    // Small eyes
+    addEyes(animal, darkMat, 0.03, 0.95, 0.42, 0.1);
+    
+    // Huge arms
+    const armGeo = new THREE.CylinderGeometry(0.1, 0.08, 0.6, 10);
+    const leftArm = new THREE.Mesh(armGeo, bodyMat);
+    leftArm.position.set(-0.45, 0.4, 0.1);
+    leftArm.rotation.z = 0.8;
+    animal.add(leftArm);
+    const rightArm = new THREE.Mesh(armGeo, bodyMat);
+    rightArm.position.set(0.45, 0.4, 0.1);
+    rightArm.rotation.z = -0.8;
+    animal.add(rightArm);
+    
+    // Legs
+    addLegs(animal, bodyMat, 0.1, 0.35, 0.25, 0.15);
+}
+
+function createTiger(animal, bodyMat, darkMat, whiteMat) {
+    // Powerful body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), bodyMat);
+    body.scale.set(0.9, 0.75, 1.4);
+    body.position.set(0, 0.5, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    // White belly
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), whiteMat);
+    belly.position.set(0, 0.4, 0.1);
+    animal.add(belly);
+    
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), bodyMat);
+    head.scale.set(1.1, 0.95, 1);
+    head.position.set(0, 0.65, 0.55);
+    animal.add(head);
+    
+    // White muzzle
+    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), whiteMat);
+    muzzle.scale.set(1, 0.7, 0.8);
+    muzzle.position.set(0, 0.58, 0.75);
+    animal.add(muzzle);
+    
+    // Nose
+    const noseMat = new THREE.MeshStandardMaterial({ color: 0xff9999 });
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), noseMat);
+    nose.position.set(0, 0.6, 0.88);
+    animal.add(nose);
+    
+    // Round ears
+    const earGeo = new THREE.SphereGeometry(0.08, 10, 10);
+    const leftEar = new THREE.Mesh(earGeo, bodyMat);
+    leftEar.position.set(-0.2, 0.9, 0.45);
+    animal.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, bodyMat);
+    rightEar.position.set(0.2, 0.9, 0.45);
+    animal.add(rightEar);
+    
+    // Black stripes!
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+    for (let i = 0; i < 8; i++) {
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.08), stripeMat);
+        stripe.position.set(0, 0.55 + (Math.random() - 0.5) * 0.2, (i - 4) * 0.15);
+        stripe.rotation.y = (Math.random() - 0.5) * 0.3;
+        animal.add(stripe);
+    }
+    
+    // Eyes
+    const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
+    addEyes(animal, yellowMat, 0.04, 0.68, 0.7, 0.12);
+    
+    // Strong legs
+    addLegs(animal, bodyMat, 0.08, 0.4, 0.25, 0.35);
+    
+    // Long tail with stripes
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.7, 8), bodyMat);
+    tail.rotation.x = Math.PI / 4;
+    tail.position.set(0, 0.45, -0.65);
+    animal.add(tail);
+}
+
+function createGenericAnimal(animal, bodyMat, darkMat) {
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), bodyMat);
+    body.position.set(0, 0.4, 0);
+    body.castShadow = true;
+    animal.add(body);
+    
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), bodyMat);
+    head.position.set(0, 0.6, 0.35);
+    animal.add(head);
+    
+    addEyes(animal, darkMat, 0.04, 0.65, 0.5, 0.1);
+    addLegs(animal, bodyMat, 0.06, 0.3, 0.2, 0.2);
 }
 
 // Helper functions
